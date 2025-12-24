@@ -74,12 +74,20 @@ jobs:
         id: release_notes
         uses: mikepenz/release-changelog-builder-action@v6
         with:
+          mode: "HYBRID"
           configurationJson: |
             {
-              "template": "#{{CHANGELOG}}\n\n<details>\n<summary>Pull Requests</summary>\n\n#{{PR_LIST}}\n</details>\n\n---\n\n### Usage\n\n\\`\\`\\`yaml\n- uses: LiquidLogicLabs/ca-certificate-import-action@${{ github.ref_name }}\n  with:\n    certificate-source: 'path/to/cert.crt'\n\\`\\`\\`\n\n### Installation\n\nThe certificate will be installed to the system CA store and trusted by:\n- ✅ Docker (push/pull from registries with custom certs)\n- ✅ curl, wget, and other HTTP clients\n- ✅ pip, npm, apt, and other package managers\n- ✅ Git operations over HTTPS\n- ✅ Any tool that uses the system CA store"
+              "template": "#{{CHANGELOG}}\n\n<details>\n<summary>Pull Requests</summary>\n\n#{{PR_LIST}}\n</details>\n\n---\n\n### Usage\n\n```yaml\n- uses: LiquidLogicLabs/ca-certificate-import-action@${{ github.ref_name }}\n  with:\n    certificate-source: 'path/to/cert.crt'\n```\n\n### Installation\n\nThe certificate will be installed to the system CA store and trusted by:\n- ✅ Docker (push/pull from registries with custom certs)\n- ✅ curl, wget, and other HTTP clients\n- ✅ pip, npm, apt, and other package managers\n- ✅ Git operations over HTTPS\n- ✅ Any tool that uses the system CA store"
             }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create/Update Major, Minor, and Latest Version Tags
+        if: steps.version.outputs.is_stable == 'true'
+        uses: simbo/action-semver-release-action@latest
+        with:
+          create-release: false  # We handle release creation separately with changelog
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
@@ -101,5 +109,6 @@ jobs:
             echo "- **Status**: ⚠️ Pre-release (for testing)" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Status**: ✅ Stable release" >> $GITHUB_STEP_SUMMARY
+            echo "- **Version Tags Created**: \`@v${{ steps.version.outputs.major }}\`, \`@v${{ steps.version.outputs.major }}.${{ steps.version.outputs.minor }}\`, \`@latest\`, \`@${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           fi
 
