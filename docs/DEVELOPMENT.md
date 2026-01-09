@@ -14,8 +14,8 @@ This document provides information for developers who want to contribute to this
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/LiquidLogicLabs/ca-certificate-import-action.git
-cd ca-certificate-import-action
+git clone https://github.com/LiquidLogicLabs/git-action-ca-certificate-import.git
+cd git-action-ca-certificate-import
 ```
 
 ### Install Dependencies
@@ -41,7 +41,7 @@ npm test
 ## Project Structure
 
 ```
-ca-certificate-import-action/
+git-action-ca-certificate-import/
 ├── action.yml                  # Action metadata and steps
 ├── install-certificate.sh      # Main shell script
 ├── scripts/

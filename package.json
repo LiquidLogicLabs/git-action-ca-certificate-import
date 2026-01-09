@@ -5,7 +5,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/LiquidLogicLabs/ca-certificate-import-action.git"
+    "url": "https://github.com/LiquidLogicLabs/git-action-ca-certificate-import.git"
   },
   "scripts": {
     "release:patch": "standard-version --release-as patch --skip.changelog && git push --follow-tags",

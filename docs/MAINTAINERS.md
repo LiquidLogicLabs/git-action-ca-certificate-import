@@ -16,7 +16,7 @@ This document contains information for developers and maintainers of the CA Cert
 #### Step 1: Create GitHub Repository
 
 1. Go to: https://github.com/new
-2. Repository name: `ca-certificate-import-action`
+2. Repository name: `git-action-ca-certificate-import`
 3. Description: `GitHub Action for importing custom CA certificates into CI/CD environments`
 4. Public repository
 5. **Don't** initialize with README (we have one)
@@ -26,7 +26,7 @@ This document contains information for developers and maintainers of the CA Cert
 
 ```bash
 # Navigate to action directory
-cd ./ca-certificate-import-action
+cd ./git-action-ca-certificate-import
 
 # Initialize git (if not done)
 git init
@@ -43,7 +43,7 @@ git commit -m "feat: Initial release - CA Certificate Import Action
 - Comprehensive error handling and validation"
 
 # Add GitHub remote
-git remote add origin https://github.com/LiquidLogicLabs/ca-certificate-import-action.git
+git remote add origin https://github.com/LiquidLogicLabs/git-action-ca-certificate-import.git
 
 # Push to GitHub
 git branch -M main
@@ -66,8 +66,8 @@ npm run release:major
 
 #### Step 4: Verify
 
-1. **Check repository:** https://github.com/LiquidLogicLabs/ca-certificate-import-action
-2. **Check release:** https://github.com/LiquidLogicLabs/ca-certificate-import-action/releases
+1. **Check repository:** https://github.com/LiquidLogicLabs/git-action-ca-certificate-import
+2. **Check release:** https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/releases
 3. **Check tags:** Should see both `v1.0.0` and `v1`
 
 #### Step 5: Test in Another Workflow
@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Test certificate action
-        uses: LiquidLogicLabs/ca-certificate-import-action@v1
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
         with:
           certificate-source: 'https://curl.se/ca/cacert.pem'
           certificate-name: 'test.crt'
@@ -254,7 +254,7 @@ Error: Unable to resolve action ./
 Ensure you're in the repository root:
 
 ```bash
-cd ./ca-certificate-import-action
+cd ./git-action-ca-certificate-import
 act -W .github/workflows/test.yml
 ```
 
@@ -457,14 +457,14 @@ Run these commands to publish right now:
 
 ```bash
 # 1. Create repo on GitHub (do this first)
-# Repository: ca-certificate-import-action
+# Repository: git-action-ca-certificate-import
 
 # 2. Run these commands
-cd ./ca-certificate-import-action
+cd ./git-action-ca-certificate-import
 git init
 git add .
 git commit -m "feat: Initial release - CA Certificate Import Action"
-git remote add origin https://github.com/LiquidLogicLabs/ca-certificate-import-action.git
+git remote add origin https://github.com/LiquidLogicLabs/git-action-ca-certificate-import.git
 git branch -M main
 git push -u origin main
 
@@ -472,7 +472,7 @@ git push -u origin main
 npm run release:major
 
 # 4. Done! Check:
-# https://github.com/LiquidLogicLabs/ca-certificate-import-action
+# https://github.com/LiquidLogicLabs/git-action-ca-certificate-import
 ```
 
 ## Support & Community

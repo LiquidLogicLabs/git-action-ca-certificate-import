@@ -17,7 +17,7 @@ A GitHub Action that installs custom SSL/TLS certificates into the CI/CD runner 
 
 ```yaml
 - name: Install custom certificate
-  uses: LiquidLogicLabs/ca-certificate-import-action@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
   with:
     certificate-source: 'certs/company-ca.crt'
 ```
@@ -26,7 +26,7 @@ A GitHub Action that installs custom SSL/TLS certificates into the CI/CD runner 
 
 ```yaml
 - name: Install certificate from URL
-  uses: LiquidLogicLabs/ca-certificate-import-action@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
   with:
     certificate-source: 'https://pki.company.com/ca.crt'
 ```
@@ -35,7 +35,7 @@ A GitHub Action that installs custom SSL/TLS certificates into the CI/CD runner 
 
 ```yaml
 - name: Install certificate from secret
-  uses: LiquidLogicLabs/ca-certificate-import-action@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
   with:
     certificate-source: 'inline'
     certificate-body: ${{ secrets.CUSTOM_CA_CERT }}
@@ -47,7 +47,7 @@ A GitHub Action that installs custom SSL/TLS certificates into the CI/CD runner 
 ```yaml
 - name: Install certificate and generate buildkit.toml
   id: install-cert
-  uses: LiquidLogicLabs/ca-certificate-import-action@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
   with:
     certificate-source: 'certs/company-ca.crt'
     generate-buildkit: 'true'
@@ -134,7 +134,7 @@ This action follows [Semantic Versioning](https://semver.org/).
 
 **Recommended usage:**
 ```yaml
-uses: LiquidLogicLabs/ca-certificate-import-action@v1  # Gets latest v1.x.x
+uses: LiquidLogicLabs/git-action-ca-certificate-import@v1  # Gets latest v1.x.x
 ```
 
 ## 🚀 Quick Release

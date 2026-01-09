@@ -9,8 +9,9 @@ permissions:
 
 jobs:
   test:
-    # Always run when called via workflow_call or workflow_dispatch, skip only on direct tag pushes
-    if: github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_type != 'tag')
+    # Always run when called via workflow_call or workflow_dispatch
+    # This workflow only has workflow_call and workflow_dispatch triggers, so it should always run
+    if: github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     name: Test Certificate Action
     

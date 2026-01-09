@@ -14,7 +14,8 @@ permissions:
 
 jobs:
   test:
-    # Always run when called via workflow_call or workflow_dispatch, skip only on direct tag pushes
-    if: github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_type != 'tag')
+    # test.yml has its own condition and only supports workflow_call and workflow_dispatch
+    # When ci.yml is triggered by push/PR/workflow_call, calling test.yml via workflow_call will work
+    # test.yml will handle the condition checking internally
     uses: ./.github/workflows/test.yml
     # test.yml runs: all tests for composite action
