@@ -8,18 +8,18 @@ This document provides comprehensive examples of using the CA Certificate Import
 
 ```yaml
 - name: Install company CA certificate
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: 'certs/company-ca.crt'
+    certificate: 'certs/company-ca.crt'
 ```
 
 ### 2. Install Certificate from URL
 
 ```yaml
 - name: Install certificate from PKI server
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: 'https://pki.company.com/certs/root-ca.crt'
+    certificate: 'https://pki.company.com/certs/root-ca.crt'
     certificate-name: 'company-root-ca.crt'
 ```
 
@@ -27,10 +27,9 @@ This document provides comprehensive examples of using the CA Certificate Import
 
 ```yaml
 - name: Install certificate from secret
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: 'inline'
-    certificate-body: ${{ secrets.CUSTOM_CA_CERT }}
+    certificate: ${{ secrets.CUSTOM_CA_CERT }}
     certificate-name: 'custom-ca.crt'
 ```
 
@@ -40,26 +39,26 @@ This document provides comprehensive examples of using the CA Certificate Import
 
 ```yaml
 - name: Install root CA
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: 'certs/root-ca.crt'
+    certificate: 'certs/root-ca.crt'
     certificate-name: 'root-ca.crt'
 
 - name: Install intermediate CA
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: 'certs/intermediate-ca.crt'
+    certificate: 'certs/intermediate-ca.crt'
     certificate-name: 'intermediate-ca.crt'
 ```
 
 ### 5. With Debug Output
 
 ```yaml
-- name: Install certificate with debugging
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+- name: Install certificate with verboseging
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: 'certs/debug-ca.crt'
-    debug: true
+    certificate: 'certs/verbose-ca.crt'
+    verbose: true
 ```
 
 ### 6. Generate BuildKit Configuration
@@ -67,12 +66,12 @@ This document provides comprehensive examples of using the CA Certificate Import
 ```yaml
 - name: Install certificate and generate buildkit.toml
   id: install-cert
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: 'certs/company-ca.crt'
+    certificate: 'certs/company-ca.crt'
     certificate-name: 'company-ca.crt'
     generate-buildkit: 'true'
-    debug: true
+    verbose: true
 ```
 
 ### 7. Generate BuildKit Configuration with Custom Runtime
@@ -80,13 +79,13 @@ This document provides comprehensive examples of using the CA Certificate Import
 ```yaml
 - name: Install certificate and generate buildkit.toml with custom runtime
   id: install-cert
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: 'certs/company-ca.crt'
+    certificate: 'certs/company-ca.crt'
     certificate-name: 'company-ca.crt'
     generate-buildkit: 'true'
     buildkit-runtime: 'io.containerd.runc.v2'
-    debug: true
+    verbose: true
 
 - name: Setup Docker BuildKit with custom CA
   run: |
@@ -120,10 +119,9 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Install custom CA certificate
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
         with:
-          certificate-source: 'inline'
-          certificate-body: ${{ secrets.COMPANY_CA_CERT }}
+          certificate: ${{ secrets.COMPANY_CA_CERT }}
           certificate-name: 'company-ca.crt'
       
       - name: Set up Docker Buildx
@@ -162,10 +160,10 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Install certificate from URL
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
         with:
-          certificate-source: 'https://pki.internal.net/ca/root.crt'
-          debug: true
+          certificate: 'https://pki.internal.net/ca/root.crt'
+          verbose: true
       
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -208,9 +206,9 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Install custom CA for internal PyPI
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
         with:
-          certificate-source: ${{ secrets.PYPI_CA_CERT }}
+          certificate: ${{ secrets.PYPI_CA_CERT }}
           certificate-name: 'internal-pypi-ca.crt'
       
       - name: Set up Python
@@ -244,9 +242,9 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Install custom CA for internal npm
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
         with:
-          certificate-source: 'https://pki.company.com/npm-ca.crt'
+          certificate: 'https://pki.company.com/npm-ca.crt'
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -278,9 +276,9 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Install custom CA certificate
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
         with:
-          certificate-source: 'certs/internal-ca.crt'
+          certificate: 'certs/internal-ca.crt'
       
       - name: Build image (can access internal resources in Dockerfile)
         uses: docker/build-push-action@v6
@@ -301,10 +299,10 @@ jobs:
 
 ```yaml
 - name: Install certificate
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   id: install-cert
   with:
-    certificate-source: 'certs/ca.crt'
+    certificate: 'certs/ca.crt'
 
 - name: Verify certificate was installed
   run: |
@@ -325,11 +323,11 @@ jobs:
 
 ```yaml
 - name: Install certificate
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: ${{ secrets.REGISTRY_CA }}
+    certificate: ${{ secrets.REGISTRY_CA }}
     certificate-name: 'registry-ca.crt'
-    debug: true
+    verbose: true
 
 - name: Test registry connectivity
   run: |
@@ -361,9 +359,9 @@ jobs:
 ```yaml
 - name: Install custom certificate
   if: ${{ env.CUSTOM_CERTIFICATE }}
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: '/certs/${{ env.CUSTOM_CERTIFICATE }}'
+    certificate: '/certs/${{ env.CUSTOM_CERTIFICATE }}'
 ```
 
 ### 15. Conditional Certificate Installation
@@ -371,10 +369,9 @@ jobs:
 ```yaml
 - name: Install certificate (production only)
   if: github.ref == 'refs/heads/main'
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: 'inline'
-    certificate-body: ${{ secrets.PROD_CA_CERT }}
+    certificate: ${{ secrets.PROD_CA_CERT }}
     certificate-name: 'prod-ca.crt'
 ```
 
@@ -389,9 +386,9 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Install certificate from environment URL
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
         with:
-          certificate-source: ${{ env.CERT_URL }}
+          certificate: ${{ env.CERT_URL }}
 ```
 
 ## Real-World Use Cases
@@ -414,10 +411,9 @@ jobs:
       
       # Install corporate CA certificate
       - name: Install corporate CA
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
         with:
-          certificate-source: 'inline'
-          certificate-body: ${{ secrets.CORPORATE_CA_CERT }}
+          certificate: ${{ secrets.CORPORATE_CA_CERT }}
           certificate-name: 'corporate-ca.crt'
       
       # Now all internal services work automatically
@@ -465,13 +461,12 @@ jobs:
       
       - name: Install certificate and generate buildkit.toml
         id: cert-install
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
         with:
-          certificate-source: 'inline'
-          certificate-body: ${{ secrets.COMPANY_CA_CERT }}
+          certificate: ${{ secrets.COMPANY_CA_CERT }}
           certificate-name: 'company-ca.crt'
           generate-buildkit: 'true'
-          debug: true
+          verbose: true
       
       - name: Setup Docker BuildKit with custom configuration
         run: |

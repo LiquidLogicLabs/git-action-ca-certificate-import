@@ -23,22 +23,22 @@ log_error() {
 }
 
 log_debug() {
-    if [ "$INPUT_DEBUG" = "true" ]; then
+    if [ "$INPUT_VERBOSE" = "true" ]; then
         echo -e "${CYAN}[DEBUG]${NC} $1"
     fi
 }
 
-# Enable debug mode if requested
-if [ "$INPUT_DEBUG" = "true" ]; then
+# Enable verbose mode if requested
+if [ "$INPUT_VERBOSE" = "true" ]; then
     set -x
     echo ""
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${BLUE}🐛 DEBUG MODE ENABLED${NC}"
+    echo -e "${BLUE}🔍 VERBOSE MODE ENABLED${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     log_debug "Environment Information:"
-    log_debug "  INPUT_CERTIFICATE_SOURCE: ${INPUT_CERTIFICATE_SOURCE:-<not set>}"
+    log_debug "  INPUT_CERTIFICATE: ${INPUT_CERTIFICATE:0:50}${INPUT_CERTIFICATE:+...}"
     log_debug "  INPUT_CERTIFICATE_NAME: ${INPUT_CERTIFICATE_NAME:-<not set>}"
-    log_debug "  INPUT_DEBUG: ${INPUT_DEBUG}"
+    log_debug "  INPUT_VERBOSE: ${INPUT_VERBOSE}"
     log_debug "  INPUT_GENERATE_BUILDKIT: ${INPUT_GENERATE_BUILDKIT:-<not set>}"
     log_debug "  Working Directory: $(pwd)"
     log_debug "  User: $(whoami)"
@@ -48,10 +48,40 @@ if [ "$INPUT_DEBUG" = "true" ]; then
 fi
 
 # Validate required inputs
-if [ -z "$INPUT_CERTIFICATE_SOURCE" ]; then
-    log_error "certificate-source is required"
+if [ -z "$INPUT_CERTIFICATE" ]; then
+    log_error "certificate input is required"
     exit 1
 fi
+
+# Function to detect certificate source type
+detect_certificate_type() {
+    local input="$1"
+    
+    # 1. Check if it's a URL (highest priority - most specific)
+    if [[ "$input" =~ ^https?:// ]]; then
+        echo "url"
+        return 0
+    fi
+    
+    # 2. Check if it's inline content (contains PEM markers)
+    # This check comes before file existence to handle edge cases where
+    # a string contains PEM content but also looks like a file path
+    # Check for BEGIN and CERTIFICATE markers (handles various PEM formats)
+    if echo "$input" | grep -qE "BEGIN[[:space:]]+.*CERTIFICATE" || echo "$input" | grep -qF "-----BEGIN CERTIFICATE-----"; then
+        echo "inline"
+        return 0
+    fi
+    
+    # 3. Check if it's a file path that exists
+    if [ -f "$input" ]; then
+        echo "file"
+        return 0
+    fi
+    
+    # 4. Could not determine type
+    echo "unknown"
+    return 1
+}
 
 # Determine certificate name
 CERT_NAME="$INPUT_CERTIFICATE_NAME"
@@ -68,50 +98,62 @@ TEMP_CERT="$TEMP_DIR/$CERT_NAME"
 log_debug "Created temporary directory: $TEMP_DIR"
 log_debug "Temporary certificate path: $TEMP_CERT"
 
-log_info "Processing certificate from source: $INPUT_CERTIFICATE_SOURCE"
+# Detect certificate source type automatically
+CERT_TYPE=$(detect_certificate_type "$INPUT_CERTIFICATE")
+log_debug "Auto-detected certificate type: $CERT_TYPE"
 
-# Acquire certificate based on source type
-if [ "$INPUT_CERTIFICATE_SOURCE" = "inline" ]; then
-    # Certificate provided as inline content
-    if [ -z "$INPUT_CERTIFICATE_BODY" ]; then
-        log_error "certificate-body is required when certificate-source is 'inline'"
+# Acquire certificate based on auto-detected type
+case "$CERT_TYPE" in
+    "url")
+        log_info "Auto-detected: URL source"
+        log_info "Downloading certificate from: $INPUT_CERTIFICATE"
+        log_debug "Using curl to download certificate..."
+        
+        if ! curl -fsSL -o "$TEMP_CERT" "$INPUT_CERTIFICATE"; then
+            log_error "Failed to download certificate from URL: $INPUT_CERTIFICATE"
+            log_error "Please verify the URL is accessible and correct"
+            rm -rf "$TEMP_DIR"
+            exit 1
+        fi
+        
+        log_info "Certificate downloaded successfully"
+        log_debug "Downloaded file size: $(stat -c%s "$TEMP_CERT" 2>/dev/null || stat -f%z "$TEMP_CERT" 2>/dev/null) bytes"
+        ;;
+        
+    "inline")
+        log_info "Auto-detected: Inline certificate content"
+        log_debug "Certificate content length: ${#INPUT_CERTIFICATE} characters"
+        echo "$INPUT_CERTIFICATE" > "$TEMP_CERT"
+        ;;
+        
+    "file")
+        log_info "Auto-detected: File path source"
+        log_info "Using certificate file: $INPUT_CERTIFICATE"
+        log_debug "Source file size: $(stat -c%s "$INPUT_CERTIFICATE" 2>/dev/null || stat -f%z "$INPUT_CERTIFICATE" 2>/dev/null) bytes"
+        cp "$INPUT_CERTIFICATE" "$TEMP_CERT"
+        ;;
+        
+    *)
+        log_error "Could not determine certificate source type"
+        log_error ""
+        log_error "The certificate input should be one of:"
+        log_error "  1. A URL starting with http:// or https://"
+        log_error "     Example: https://pki.company.com/ca.crt"
+        log_error ""
+        log_error "  2. A file path (relative or absolute) to an existing certificate file"
+        log_error "     Example: certs/ca.crt or /path/to/certificate.crt"
+        log_error ""
+        log_error "  3. Inline certificate content containing -----BEGIN CERTIFICATE----- markers"
+        log_error "     Example: Content from GitHub Secrets or workflow variables"
+        log_error ""
+        log_error "Received input (first 100 chars): ${INPUT_CERTIFICATE:0:100}..."
         rm -rf "$TEMP_DIR"
         exit 1
-    fi
-    
-    log_info "Using inline certificate content"
-    log_debug "Certificate body length: ${#INPUT_CERTIFICATE_BODY} characters"
-    echo "$INPUT_CERTIFICATE_BODY" > "$TEMP_CERT"
+        ;;
+esac
 
-elif [[ "$INPUT_CERTIFICATE_SOURCE" =~ ^https?:// ]]; then
-    # Certificate provided as URL
-    log_info "Downloading certificate from URL: $INPUT_CERTIFICATE_SOURCE"
-    log_debug "Using curl to download certificate..."
-    
-    if ! curl -fsSL -o "$TEMP_CERT" "$INPUT_CERTIFICATE_SOURCE"; then
-        log_error "Failed to download certificate from URL"
-        rm -rf "$TEMP_DIR"
-        exit 1
-    fi
-    
-    log_info "Certificate downloaded successfully"
-    log_debug "Downloaded file size: $(stat -c%s "$TEMP_CERT" 2>/dev/null || stat -f%z "$TEMP_CERT" 2>/dev/null) bytes"
-
-else
-    # Certificate provided as file path
-    if [ ! -f "$INPUT_CERTIFICATE_SOURCE" ]; then
-        log_error "Certificate file not found: $INPUT_CERTIFICATE_SOURCE"
-        rm -rf "$TEMP_DIR"
-        exit 1
-    fi
-    
-    log_info "Using certificate file: $INPUT_CERTIFICATE_SOURCE"
-    log_debug "Source file size: $(stat -c%s "$INPUT_CERTIFICATE_SOURCE" 2>/dev/null || stat -f%z "$INPUT_CERTIFICATE_SOURCE" 2>/dev/null) bytes"
-    cp "$INPUT_CERTIFICATE_SOURCE" "$TEMP_CERT"
-fi
-
-# Show certificate preview in debug mode
-if [ "$INPUT_DEBUG" = "true" ]; then
+# Show certificate preview in verbose mode
+if [ "$INPUT_VERBOSE" = "true" ]; then
     log_debug "Certificate content preview (first 3 lines):"
     head -n 3 "$TEMP_CERT" | sed 's/^/  /'
     log_debug "Certificate content preview (last 2 lines):"
@@ -128,8 +170,8 @@ fi
 
 log_info "Certificate format validated"
 
-# Show certificate details in debug mode
-if [ "$INPUT_DEBUG" = "true" ]; then
+# Show certificate details in verbose mode
+if [ "$INPUT_VERBOSE" = "true" ]; then
     log_debug "Certificate details:"
     if openssl x509 -in "$TEMP_CERT" -noout -subject -issuer -dates 2>/dev/null; then
         log_debug "Certificate parsed successfully"
@@ -161,7 +203,7 @@ sudo cp "$TEMP_CERT" "$SYSTEM_CERT_PATH"
 log_info "Certificate copied to: $SYSTEM_CERT_PATH"
 
 # Verify copy
-if [ "$INPUT_DEBUG" = "true" ]; then
+if [ "$INPUT_VERBOSE" = "true" ]; then
     if [ -f "$SYSTEM_CERT_PATH" ]; then
         log_debug "Certificate file exists at destination"
         log_debug "Destination file size: $(stat -c%s "$SYSTEM_CERT_PATH" 2>/dev/null || stat -f%z "$SYSTEM_CERT_PATH" 2>/dev/null) bytes"
@@ -173,7 +215,7 @@ fi
 # Update CA certificates
 log_info "Updating system CA certificates"
 log_debug "Running update-ca-certificates..."
-if [ "$INPUT_DEBUG" = "true" ]; then
+if [ "$INPUT_VERBOSE" = "true" ]; then
     sudo update-ca-certificates -v
 else
     sudo update-ca-certificates
@@ -228,7 +270,7 @@ EOF
     
     log_info "buildkit.toml generated at: $BUILDKIT_PATH"
     
-    if [ "$INPUT_DEBUG" = "true" ]; then
+    if [ "$INPUT_VERBOSE" = "true" ]; then
         log_debug "buildkit.toml content:"
         cat "$BUILDKIT_PATH" | sed 's/^/  /'
     fi
@@ -250,7 +292,7 @@ log_debug "Outputs set: certificate-path=$SYSTEM_CERT_PATH, certificate-name=$CE
 log_debug "Cleaning up temporary directory: $TEMP_DIR"
 rm -rf "$TEMP_DIR"
 
-if [ "$INPUT_DEBUG" = "true" ]; then
+if [ "$INPUT_VERBOSE" = "true" ]; then
     echo ""
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}✓ Certificate installation completed successfully${NC}"

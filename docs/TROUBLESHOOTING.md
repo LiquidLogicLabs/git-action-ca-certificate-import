@@ -28,9 +28,9 @@ This guide helps resolve common issues when using the CA Certificate Import Acti
   uses: actions/checkout@v4  # Must run before using file paths
 
 - name: Install certificate
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: 'certs/ca.crt'  # Relative to repo root
+    certificate: 'certs/ca.crt'  # Relative to repo root
 ```
 
 ---
@@ -62,9 +62,9 @@ This guide helps resolve common issues when using the CA Certificate Import Acti
     curl -k -o /tmp/ca.crt https://internal.server/ca.crt
 
 - name: Install certificate
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: '/tmp/ca.crt'
+    certificate: '/tmp/ca.crt'
 ```
 
 ---
@@ -150,13 +150,13 @@ SSL certificate problem: unable to get local issuer certificate
 - name: Install root CA
   uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
   with:
-    certificate-source: 'certs/root-ca.crt'
+    certificate: 'certs/root-ca.crt'
     certificate-name: 'root-ca.crt'
 
 - name: Install intermediate CA
   uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
   with:
-    certificate-source: 'certs/intermediate-ca.crt'
+    certificate: 'certs/intermediate-ca.crt'
     certificate-name: 'intermediate-ca.crt'
 ```
 
@@ -186,8 +186,8 @@ Error response from daemon: Get https://registry.example.com/v2/: x509: certific
 - name: Install certificate FIRST
   uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
   with:
-    certificate-source: 'certs/ca.crt'
-    debug: true
+    certificate: 'certs/ca.crt'
+    verbose: true
 
 - name: Set up Docker Buildx AFTER certificate
   uses: docker/setup-buildx-action@v3
@@ -206,36 +206,41 @@ Error response from daemon: Get https://registry.example.com/v2/: x509: certific
 
 **Error Message:**
 ```
-[ERROR] certificate-body is required when certificate-source is 'inline'
+[ERROR] Could not determine certificate source type
 ```
 
 **Causes:**
 - Secret not properly referenced
 - Secret value is empty
+- Certificate content doesn't contain PEM markers (`-----BEGIN CERTIFICATE-----`)
 - Multiline secret formatting issue
 
 **Solutions:**
 - Verify secret exists and has content
-- Test secret value (without exposing): `echo "${{ secrets.YOUR_SECRET }}" | wc -l`
+- Ensure certificate content includes PEM markers: `-----BEGIN CERTIFICATE-----`
+- Test secret value (without exposing): `echo "${{ secrets.YOUR_SECRET }}" | grep -q "BEGIN CERTIFICATE" && echo "Valid" || echo "Invalid"`
 - Check secret formatting in GitHub settings
 
 **Example Fix:**
 ```yaml
-# Correct inline usage
+# Correct inline usage (auto-detected)
 - name: Install from secret
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
-    certificate-source: 'inline'
-    certificate-body: ${{ secrets.CA_CERTIFICATE }}
+    certificate: ${{ secrets.CA_CERTIFICATE }}  # Auto-detected as inline content
     certificate-name: 'custom-ca.crt'
 
-# Verify secret (debug)
-- name: Check secret (debug only - remove in production)
+# Verify secret (verbose)
+- name: Check secret (verbose only - remove in production)
   run: |
     if [ -z "${{ secrets.CA_CERTIFICATE }}" ]; then
       echo "Secret is empty!"
     else
-      echo "Secret is set (length: $(echo '${{ secrets.CA_CERTIFICATE }}' | wc -c))"
+      if echo "${{ secrets.CA_CERTIFICATE }}" | grep -q "BEGIN CERTIFICATE"; then
+        echo "Secret contains valid PEM certificate"
+      else
+        echo "Warning: Secret doesn't appear to contain PEM certificate markers"
+      fi
     fi
 ```
 
@@ -246,11 +251,11 @@ Error response from daemon: Get https://registry.example.com/v2/: x509: certific
 ### Enable Debug Mode
 
 ```yaml
-- name: Install certificate with debug output
+- name: Install certificate with verbose output
   uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
   with:
-    certificate-source: 'certs/ca.crt'
-    debug: true  # Enables verbose output
+    certificate: 'certs/ca.crt'
+    verbose: true  # Enables verbose output
 ```
 
 ### Manual Verification
@@ -303,7 +308,7 @@ ls -la /etc/ssl/certs/ca-certificates.crt
 
 If you're still experiencing issues:
 
-1. **Enable debug mode** in the action
+1. **Enable verbose mode** in the action
 2. **Check action outputs** for certificate path and name
 3. **Verify certificate format** using openssl
 4. **Test manually** with curl

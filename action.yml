@@ -7,22 +7,21 @@ branding:
   color: 'blue'
 
 inputs:
-  certificate-source:
-    description: 'Certificate source: file path, URL, or "inline" for direct content'
+  certificate:
+    description: |
+      Certificate source: auto-detects file path, URL, or inline content.
+      - URL: starts with http:// or https:// (e.g., 'https://pki.company.com/ca.crt')
+      - File path: relative or absolute path to certificate file (e.g., 'certs/ca.crt')
+      - Inline: contains -----BEGIN CERTIFICATE----- markers (e.g., from secrets)
     required: true
-  
-  certificate-body:
-    description: 'Certificate content (required when certificate-source is "inline")'
-    required: false
-    default: ''
   
   certificate-name:
     description: 'Name for the certificate file (auto-generated if not specified)'
     required: false
     default: ''
   
-  debug:
-    description: 'Enable debug output'
+  verbose:
+    description: 'Enable verbose debug logging'
     required: false
     default: 'false'
   
@@ -57,10 +56,9 @@ runs:
       shell: bash
       run: ${{ github.action_path }}/install-certificate.sh
       env:
-        INPUT_CERTIFICATE_SOURCE: ${{ inputs.certificate-source }}
-        INPUT_CERTIFICATE_BODY: ${{ inputs.certificate-body }}
+        INPUT_CERTIFICATE: ${{ inputs.certificate }}
         INPUT_CERTIFICATE_NAME: ${{ inputs.certificate-name }}
-        INPUT_DEBUG: ${{ inputs.debug }}
+        INPUT_VERBOSE: ${{ inputs.verbose }}
         INPUT_GENERATE_BUILDKIT: ${{ inputs.generate-buildkit }}
         INPUT_BUILDKIT_RUNTIME: ${{ inputs.buildkit-runtime }}
 

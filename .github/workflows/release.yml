@@ -86,7 +86,7 @@ jobs:
           mode: "HYBRID"
           configurationJson: |
             {
-              "template": "#{{CHANGELOG}}\n\n<details>\n<summary>Pull Requests</summary>\n\n#{{PR_LIST}}\n</details>\n\n---\n\n### Usage\n\n```yaml\n- uses: LiquidLogicLabs/ca-certificate-import-action@${{ github.ref_name }}\n  with:\n    certificate-source: 'path/to/cert.crt'\n```\n\n### Installation\n\nThe certificate will be installed to the system CA store and trusted by:\n- ✅ Docker (push/pull from registries with custom certs)\n- ✅ curl, wget, and other HTTP clients\n- ✅ pip, npm, apt, and other package managers\n- ✅ Git operations over HTTPS\n- ✅ Any tool that uses the system CA store"
+              "template": "#{{CHANGELOG}}\n\n<details>\n<summary>Pull Requests</summary>\n\n#{{PR_LIST}}\n</details>\n\n---\n\n### Usage\n\n```yaml\n- uses: LiquidLogicLabs/git-action-ca-certificate-import@${{ github.ref_name }}\n  with:\n    certificate: 'path/to/cert.crt'  # Auto-detects: file path, URL, or inline content\n```\n\n### Installation\n\nThe certificate will be installed to the system CA store and trusted by:\n- ✅ Docker (push/pull from registries with custom certs)\n- ✅ curl, wget, and other HTTP clients\n- ✅ pip, npm, apt, and other package managers\n- ✅ Git operations over HTTPS\n- ✅ Any tool that uses the system CA store"
             }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

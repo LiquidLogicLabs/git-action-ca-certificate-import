@@ -31,9 +31,9 @@ For manual testing of shell scripts:
 
 Set environment variables to simulate GitHub Actions inputs:
 ```bash
-export INPUT_CERTIFICATE_SOURCE='path/to/cert.crt'
+export INPUT_CERTIFICATE='path/to/cert.crt'
 export INPUT_CERTIFICATE_NAME='test-cert.crt'
-export INPUT_DEBUG='true'
+export INPUT_VERBOSE='true'
 ./install-certificate.sh
 ```
 
@@ -57,17 +57,17 @@ Tests run in GitHub Actions via `.github/workflows/test.yml`:
 
 ### Test Scenarios
 
-1. **Certificate from file path**
-   - Input: `certificate-source: 'path/to/cert.crt'`
-   - Verifies: Certificate is installed to system CA store
+1. **Certificate from file path** (auto-detected)
+   - Input: `certificate: 'path/to/cert.crt'`
+   - Verifies: Certificate is installed to system CA store, auto-detected as file path
 
-2. **Certificate from URL**
-   - Input: `certificate-source: 'https://example.com/ca.crt'`
-   - Verifies: Certificate is downloaded and installed
+2. **Certificate from URL** (auto-detected)
+   - Input: `certificate: 'https://example.com/ca.crt'`
+   - Verifies: Certificate is downloaded and installed, auto-detected as URL
 
-3. **Certificate from inline content**
-   - Input: `certificate-source: 'inline'`, `certificate-body: '-----BEGIN CERTIFICATE-----...'`
-   - Verifies: Certificate content is saved and installed
+3. **Certificate from inline content** (auto-detected)
+   - Input: `certificate: '-----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----'`
+   - Verifies: Certificate content is saved and installed, auto-detected as inline content via PEM markers
 
 4. **BuildKit configuration generation**
    - Input: `generate-buildkit: 'true'`
@@ -90,16 +90,17 @@ For comprehensive manual testing:
 2. **Test each input scenario**:
    ```bash
    # File path
-   export INPUT_CERTIFICATE_SOURCE='test-certs/test.crt'
+   export INPUT_CERTIFICATE='test-certs/test.crt'
    ./install-certificate.sh
 
    # URL
-   export INPUT_CERTIFICATE_SOURCE='https://example.com/ca.crt'
+   export INPUT_CERTIFICATE='https://example.com/ca.crt'
    ./install-certificate.sh
 
    # Inline
-   export INPUT_CERTIFICATE_SOURCE='inline'
-   export INPUT_CERTIFICATE_BODY='-----BEGIN CERTIFICATE-----...'
+   export INPUT_CERTIFICATE='-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----'
    ./install-certificate.sh
    ```
 

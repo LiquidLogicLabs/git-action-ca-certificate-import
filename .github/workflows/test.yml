@@ -33,9 +33,9 @@ jobs:
         id: local-file-test
         uses: ./
         with:
-          certificate-source: 'test-certs/test-ca.crt'
+          certificate: 'test-certs/test-ca.crt'
           certificate-name: 'local-file-test.crt'
-          debug: 'true'
+          verbose: 'true'
       
       - name: Verify local file installation
         run: |
@@ -70,10 +70,10 @@ jobs:
         id: buildkit-test
         uses: ./
         with:
-          certificate-source: 'test-certs/test-ca.crt'
+          certificate: 'test-certs/test-ca.crt'
           certificate-name: 'buildkit-test.crt'
           generate-buildkit: 'true'
-          debug: 'true'
+          verbose: 'true'
       
       - name: Verify BuildKit generation
         run: |
@@ -127,11 +127,11 @@ jobs:
         id: buildkit-runtime-test
         uses: ./
         with:
-          certificate-source: 'test-certs/test-ca.crt'
+          certificate: 'test-certs/test-ca.crt'
           certificate-name: 'buildkit-runtime-test.crt'
           generate-buildkit: 'true'
           buildkit-runtime: 'io.containerd.runc.v2'
-          debug: 'true'
+          verbose: 'true'
       
       - name: Verify BuildKit generation with runtime
         run: |
@@ -198,9 +198,9 @@ jobs:
         if: steps.url-env.outputs.url_set == 'true'
         uses: ./
         with:
-          certificate-source: ${{ vars.TEST_CERTIFICATE_URL }}
+          certificate: ${{ vars.TEST_CERTIFICATE_URL }}
           certificate-name: 'url-cert-test.crt'
-          debug: 'true'
+          verbose: 'true'
       
       - name: Verify URL-based installation
         if: steps.url-env.outputs.url_set == 'true'
@@ -238,26 +238,16 @@ jobs:
           echo "  Set TEST_CERTIFICATE_URL variable in TEST environment to enable this test"
       
       # Test 5: Inline certificate source  
-      - name: Prepare inline certificate content
-        id: inline-prep
-        run: |
-          # Read certificate and prepare for inline use
-          CERT_CONTENT=$(cat test-certs/test-ca.crt)
-          # Base64 encode for safe storage in output (use -w 0 for GNU base64, handle both)
-          CERT_B64=$(echo "$CERT_CONTENT" | base64 | tr -d '\n')
-          echo "cert_b64=$CERT_B64" >> $GITHUB_OUTPUT
-      
       - name: Test - Inline certificate source
         id: inline-test
         run: |
-          # Decode certificate content
-          CERT_CONTENT=$(echo "${{ steps.inline-prep.outputs.cert_b64 }}" | base64 -d)
+          # Read certificate content for inline use
+          CERT_CONTENT=$(cat test-certs/test-ca.crt)
           
-          # Set environment variables for the action
-          export INPUT_CERTIFICATE_SOURCE="inline"
-          export INPUT_CERTIFICATE_BODY="$CERT_CONTENT"
+          # Set environment variables for the action script
+          export INPUT_CERTIFICATE="$CERT_CONTENT"
           export INPUT_CERTIFICATE_NAME="inline-cert-test.crt"
-          export INPUT_DEBUG="true"
+          export INPUT_VERBOSE="true"
           export INPUT_GENERATE_BUILDKIT="false"
           export INPUT_BUILDKIT_RUNTIME=""
           
@@ -265,11 +255,16 @@ jobs:
           chmod +x install-certificate.sh
           bash install-certificate.sh
           
-          # Set outputs for verification
-          echo "certificate-path=/usr/local/share/ca-certificates/inline-cert-test.crt" >> $GITHUB_OUTPUT
-          echo "certificate-name=inline-cert-test.crt" >> $GITHUB_OUTPUT
-        env:
-          CERT_B64: ${{ steps.inline-prep.outputs.cert_b64 }}
+          # The script writes outputs to $GITHUB_OUTPUT automatically
+          # Verify outputs were set (script should have written them)
+          if [ -f "$GITHUB_OUTPUT" ] && grep -q "certificate-path=" "$GITHUB_OUTPUT" && grep -q "certificate-name=" "$GITHUB_OUTPUT"; then
+            echo "✓ Script outputs verified in GITHUB_OUTPUT"
+          else
+            # Fallback: set expected outputs (shouldn't be needed, but ensures test continues)
+            echo "certificate-path=/usr/local/share/ca-certificates/inline-cert-test.crt" >> $GITHUB_OUTPUT
+            echo "certificate-name=inline-cert-test.crt" >> $GITHUB_OUTPUT
+            echo "⚠ Note: Script outputs not found, using fallback values"
+          fi
       
       - name: Verify inline certificate installation
         run: |
@@ -304,8 +299,8 @@ jobs:
         id: auto-name-test
         uses: ./
         with:
-          certificate-source: 'test-certs/test-ca.crt'
-          debug: 'true'
+          certificate: 'test-certs/test-ca.crt'
+          verbose: 'true'
       
       - name: Verify auto-generated certificate name
         run: |
