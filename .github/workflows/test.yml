@@ -13,6 +13,7 @@ jobs:
     # This workflow only has workflow_call and workflow_dispatch triggers, so it should always run
     runs-on: ubuntu-22.04
     name: Test Certificate Action
+    environment: TEST
     
     steps:
       - name: Checkout
@@ -29,19 +30,40 @@ jobs:
             -subj "/C=US/ST=Test/L=Test/O=Test/CN=test.example.com"
       
       - name: Test - Local file installation
+        id: local-file-test
         uses: ./
         with:
           certificate-source: 'test-certs/test-ca.crt'
+          certificate-name: 'local-file-test.crt'
           debug: 'true'
       
       - name: Verify local file installation
         run: |
-          if [ -f /usr/local/share/ca-certificates/custom-ca-*.crt ]; then
+          # Verify certificate file exists
+          if [ -f /usr/local/share/ca-certificates/local-file-test.crt ]; then
             echo "✓ Certificate installed from local file"
           else
             echo "✗ Certificate not found in system CA store"
             exit 1
           fi
+          
+          # Verify outputs
+          CERT_PATH="${{ steps.local-file-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.local-file-test.outputs.certificate-name }}"
+          
+          if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/local-file-test.crt" ]; then
+            echo "✗ certificate-path output incorrect: $CERT_PATH"
+            exit 1
+          fi
+          
+          if [ "$CERT_NAME" != "local-file-test.crt" ]; then
+            echo "✗ certificate-name output incorrect: $CERT_NAME"
+            exit 1
+          fi
+          
+          echo "✓ Outputs verified:"
+          echo "  certificate-path: $CERT_PATH"
+          echo "  certificate-name: $CERT_NAME"
       
       # Test 2: BuildKit generation
       - name: Test - BuildKit generation
@@ -56,29 +78,49 @@ jobs:
       - name: Verify BuildKit generation
         run: |
           BUILDKIT_PATH="${{ steps.buildkit-test.outputs.buildkit-path }}"
+          CERT_PATH="${{ steps.buildkit-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.buildkit-test.outputs.certificate-name }}"
+          
+          # Verify buildkit-path output
           if [ -f "$BUILDKIT_PATH" ]; then
             echo "✓ buildkit.toml generated successfully"
             echo "  Path: $BUILDKIT_PATH"
-            
-            # Verify buildkit.toml content and structure
-            if grep -q "buildkit-test.crt" "$BUILDKIT_PATH" && grep -q "\[worker.oci\]" "$BUILDKIT_PATH"; then
-              echo "✓ buildkit.toml has correct content and structure"
-            else
-              echo "✗ buildkit.toml missing required content or structure"
-              exit 1
-            fi
-            
-            # Verify no runtime configuration (default behavior)
-            if grep -q "\[worker.containerd\]" "$BUILDKIT_PATH"; then
-              echo "✗ buildkit.toml should not contain runtime configuration by default"
-              exit 1
-            else
-              echo "✓ buildkit.toml correctly omits runtime configuration by default"
-            fi
           else
             echo "✗ buildkit.toml not generated"
             exit 1
           fi
+          
+          # Verify buildkit.toml content and structure
+          if grep -q "buildkit-test.crt" "$BUILDKIT_PATH" && grep -q "\[worker.oci\]" "$BUILDKIT_PATH"; then
+            echo "✓ buildkit.toml has correct content and structure"
+          else
+            echo "✗ buildkit.toml missing required content or structure"
+            exit 1
+          fi
+          
+          # Verify no runtime configuration (default behavior)
+          if grep -q "\[worker.containerd\]" "$BUILDKIT_PATH"; then
+            echo "✗ buildkit.toml should not contain runtime configuration by default"
+            exit 1
+          else
+            echo "✓ buildkit.toml correctly omits runtime configuration by default"
+          fi
+          
+          # Verify certificate outputs
+          if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/buildkit-test.crt" ]; then
+            echo "✗ certificate-path output incorrect: $CERT_PATH"
+            exit 1
+          fi
+          
+          if [ "$CERT_NAME" != "buildkit-test.crt" ]; then
+            echo "✗ certificate-name output incorrect: $CERT_NAME"
+            exit 1
+          fi
+          
+          echo "✓ All outputs verified:"
+          echo "  certificate-path: $CERT_PATH"
+          echo "  certificate-name: $CERT_NAME"
+          echo "  buildkit-path: $BUILDKIT_PATH"
       
       # Test 3: BuildKit generation with custom runtime
       - name: Test - BuildKit generation with runtime
@@ -94,29 +136,209 @@ jobs:
       - name: Verify BuildKit generation with runtime
         run: |
           BUILDKIT_PATH="${{ steps.buildkit-runtime-test.outputs.buildkit-path }}"
+          CERT_PATH="${{ steps.buildkit-runtime-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.buildkit-runtime-test.outputs.certificate-name }}"
+          
+          # Verify buildkit-path output
           if [ -f "$BUILDKIT_PATH" ]; then
             echo "✓ buildkit.toml generated successfully with runtime config"
             echo "  Path: $BUILDKIT_PATH"
-            
-            # Verify buildkit.toml content and structure
-            if grep -q "buildkit-runtime-test.crt" "$BUILDKIT_PATH" && grep -q "\[worker.oci\]" "$BUILDKIT_PATH"; then
-              echo "✓ buildkit.toml has correct content and structure"
-            else
-              echo "✗ buildkit.toml missing required content or structure"
-              exit 1
-            fi
-            
-            # Verify runtime configuration is present
-            if grep -q "\[worker.containerd\]" "$BUILDKIT_PATH" && grep -q "io.containerd.runc.v2" "$BUILDKIT_PATH"; then
-              echo "✓ buildkit.toml correctly includes runtime configuration"
-            else
-              echo "✗ buildkit.toml missing runtime configuration"
-              exit 1
-            fi
           else
             echo "✗ buildkit.toml not generated"
             exit 1
           fi
+          
+          # Verify buildkit.toml content and structure
+          if grep -q "buildkit-runtime-test.crt" "$BUILDKIT_PATH" && grep -q "\[worker.oci\]" "$BUILDKIT_PATH"; then
+            echo "✓ buildkit.toml has correct content and structure"
+          else
+            echo "✗ buildkit.toml missing required content or structure"
+            exit 1
+          fi
+          
+          # Verify runtime configuration is present
+          if grep -q "\[worker.containerd\]" "$BUILDKIT_PATH" && grep -q "io.containerd.runc.v2" "$BUILDKIT_PATH"; then
+            echo "✓ buildkit.toml correctly includes runtime configuration"
+          else
+            echo "✗ buildkit.toml missing runtime configuration"
+            exit 1
+          fi
+          
+          # Verify certificate outputs
+          if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/buildkit-runtime-test.crt" ]; then
+            echo "✗ certificate-path output incorrect: $CERT_PATH"
+            exit 1
+          fi
+          
+          if [ "$CERT_NAME" != "buildkit-runtime-test.crt" ]; then
+            echo "✗ certificate-name output incorrect: $CERT_NAME"
+            exit 1
+          fi
+          
+          echo "✓ All outputs verified:"
+          echo "  certificate-path: $CERT_PATH"
+          echo "  certificate-name: $CERT_NAME"
+          echo "  buildkit-path: $BUILDKIT_PATH"
+      
+      # Test 4: URL-based certificate source
+      - name: Set TEST_CERTIFICATE_URL env var
+        id: url-env
+        run: |
+          if [ -n "${{ vars.TEST_CERTIFICATE_URL }}" ]; then
+            echo "url_set=true" >> $GITHUB_OUTPUT
+            echo "${{ vars.TEST_CERTIFICATE_URL }}" >> $GITHUB_ENV
+          else
+            echo "url_set=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          TEST_CERTIFICATE_URL_VAR: ${{ vars.TEST_CERTIFICATE_URL }}
+      
+      - name: Test - URL-based certificate source
+        id: url-test
+        if: steps.url-env.outputs.url_set == 'true'
+        uses: ./
+        with:
+          certificate-source: ${{ vars.TEST_CERTIFICATE_URL }}
+          certificate-name: 'url-cert-test.crt'
+          debug: 'true'
+      
+      - name: Verify URL-based installation
+        if: steps.url-env.outputs.url_set == 'true'
+        run: |
+          # Verify certificate file exists
+          if [ -f /usr/local/share/ca-certificates/url-cert-test.crt ]; then
+            echo "✓ Certificate installed from URL"
+          else
+            echo "✗ Certificate not found in system CA store"
+            exit 1
+          fi
+          
+          # Verify outputs
+          CERT_PATH="${{ steps.url-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.url-test.outputs.certificate-name }}"
+          
+          if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/url-cert-test.crt" ]; then
+            echo "✗ certificate-path output incorrect: $CERT_PATH"
+            exit 1
+          fi
+          
+          if [ "$CERT_NAME" != "url-cert-test.crt" ]; then
+            echo "✗ certificate-name output incorrect: $CERT_NAME"
+            exit 1
+          fi
+          
+          echo "✓ URL installation outputs verified:"
+          echo "  certificate-path: $CERT_PATH"
+          echo "  certificate-name: $CERT_NAME"
+      
+      - name: Skip URL test - TEST_CERTIFICATE_URL not set
+        if: steps.url-env.outputs.url_set == 'false'
+        run: |
+          echo "⚠ Skipping URL-based certificate test"
+          echo "  Set TEST_CERTIFICATE_URL variable in TEST environment to enable this test"
+      
+      # Test 5: Inline certificate source  
+      - name: Prepare inline certificate content
+        id: inline-prep
+        run: |
+          # Read certificate and prepare for inline use
+          CERT_CONTENT=$(cat test-certs/test-ca.crt)
+          # Base64 encode for safe storage in output (use -w 0 for GNU base64, handle both)
+          CERT_B64=$(echo "$CERT_CONTENT" | base64 | tr -d '\n')
+          echo "cert_b64=$CERT_B64" >> $GITHUB_OUTPUT
+      
+      - name: Test - Inline certificate source
+        id: inline-test
+        run: |
+          # Decode certificate content
+          CERT_CONTENT=$(echo "${{ steps.inline-prep.outputs.cert_b64 }}" | base64 -d)
+          
+          # Set environment variables for the action
+          export INPUT_CERTIFICATE_SOURCE="inline"
+          export INPUT_CERTIFICATE_BODY="$CERT_CONTENT"
+          export INPUT_CERTIFICATE_NAME="inline-cert-test.crt"
+          export INPUT_DEBUG="true"
+          export INPUT_GENERATE_BUILDKIT="false"
+          export INPUT_BUILDKIT_RUNTIME=""
+          
+          # Run the installation script (make sure it's executable)
+          chmod +x install-certificate.sh
+          bash install-certificate.sh
+          
+          # Set outputs for verification
+          echo "certificate-path=/usr/local/share/ca-certificates/inline-cert-test.crt" >> $GITHUB_OUTPUT
+          echo "certificate-name=inline-cert-test.crt" >> $GITHUB_OUTPUT
+        env:
+          CERT_B64: ${{ steps.inline-prep.outputs.cert_b64 }}
+      
+      - name: Verify inline certificate installation
+        run: |
+          # Verify certificate file exists
+          if [ -f /usr/local/share/ca-certificates/inline-cert-test.crt ]; then
+            echo "✓ Certificate installed from inline content"
+          else
+            echo "✗ Certificate not found in system CA store"
+            exit 1
+          fi
+          
+          # Verify outputs
+          CERT_PATH="${{ steps.inline-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.inline-test.outputs.certificate-name }}"
+          
+          if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/inline-cert-test.crt" ]; then
+            echo "✗ certificate-path output incorrect: $CERT_PATH"
+            exit 1
+          fi
+          
+          if [ "$CERT_NAME" != "inline-cert-test.crt" ]; then
+            echo "✗ certificate-name output incorrect: $CERT_NAME"
+            exit 1
+          fi
+          
+          echo "✓ Inline installation outputs verified:"
+          echo "  certificate-path: $CERT_PATH"
+          echo "  certificate-name: $CERT_NAME"
+      
+      # Test 6: Auto-generated certificate name
+      - name: Test - Auto-generated certificate name
+        id: auto-name-test
+        uses: ./
+        with:
+          certificate-source: 'test-certs/test-ca.crt'
+          debug: 'true'
+      
+      - name: Verify auto-generated certificate name
+        run: |
+          # Get outputs
+          CERT_PATH="${{ steps.auto-name-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.auto-name-test.outputs.certificate-name }}"
+          
+          # Verify certificate-name follows expected pattern (custom-ca-*.crt)
+          if [[ ! "$CERT_NAME" =~ ^custom-ca-[0-9]+\.crt$ ]]; then
+            echo "✗ Auto-generated certificate name does not match expected pattern: $CERT_NAME"
+            exit 1
+          fi
+          
+          # Verify certificate-path matches certificate-name
+          EXPECTED_PATH="/usr/local/share/ca-certificates/$CERT_NAME"
+          if [ "$CERT_PATH" != "$EXPECTED_PATH" ]; then
+            echo "✗ certificate-path does not match certificate-name:"
+            echo "  Expected: $EXPECTED_PATH"
+            echo "  Got: $CERT_PATH"
+            exit 1
+          fi
+          
+          # Verify certificate file exists
+          if [ -f "$CERT_PATH" ]; then
+            echo "✓ Auto-generated certificate installed successfully"
+          else
+            echo "✗ Certificate not found at: $CERT_PATH"
+            exit 1
+          fi
+          
+          echo "✓ Auto-generated name outputs verified:"
+          echo "  certificate-path: $CERT_PATH"
+          echo "  certificate-name: $CERT_NAME"
       
       - name: Test Summary
         run: |

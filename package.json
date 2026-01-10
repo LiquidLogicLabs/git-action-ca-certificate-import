@@ -12,9 +12,11 @@
     "release:minor": "standard-version --release-as minor --skip.changelog && git push --follow-tags",
     "release:major": "standard-version --release-as major --skip.changelog && git push --follow-tags",
     "build": "echo 'Build completed - action is ready for packaging'",
-    "test": "act -j test",
-    "test:local": "act -j test --local",
-    "ci:local": "act push --local",
+    "test:act": "act -W .github/workflows/test.yml --eventpath .github/workflows/.act/event-workflow_call.json",
+    "test:act:verbose": "act -W .github/workflows/test.yml --eventpath .github/workflows/.act/event-workflow_call.json -v",
+    "test:act:ci": "act -W .github/workflows/ci.yml",
+    "test:act:release": "act push --eventpath .github/workflows/.act/event-release.json",
+    "lint:act": "act -W .github/workflows/ci.yml -j validate",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s"
   },
   "devDependencies": {
