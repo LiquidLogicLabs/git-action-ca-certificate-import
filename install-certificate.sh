@@ -28,6 +28,21 @@ log_debug() {
     fi
 }
 
+run_privileged() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+        return $?
+    fi
+
+    if command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+        return $?
+    fi
+
+    log_error "This action requires root privileges (or sudo), but sudo is not available."
+    exit 1
+}
+
 # Enable verbose mode if requested
 if [ "$INPUT_VERBOSE" = "true" ]; then
     set -x
@@ -41,7 +56,7 @@ if [ "$INPUT_VERBOSE" = "true" ]; then
     log_debug "  INPUT_VERBOSE: ${INPUT_VERBOSE}"
     log_debug "  INPUT_GENERATE_BUILDKIT: ${INPUT_GENERATE_BUILDKIT:-<not set>}"
     log_debug "  Working Directory: $(pwd)"
-    log_debug "  User: $(whoami)"
+    log_debug "  User: $(whoami 2>/dev/null || echo '<unknown>')"
     log_debug "  Runner OS: ${RUNNER_OS:-<not set>}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
@@ -67,7 +82,7 @@ detect_certificate_type() {
     # This check comes before file existence to handle edge cases where
     # a string contains PEM content but also looks like a file path
     # Check for BEGIN and CERTIFICATE markers (handles various PEM formats)
-    if echo "$input" | grep -qE "BEGIN[[:space:]]+.*CERTIFICATE" || echo "$input" | grep -qF "-----BEGIN CERTIFICATE-----"; then
+    if echo "$input" | grep -qE "BEGIN[[:space:]]+.*CERTIFICATE" || echo "$input" | grep -qF -- "-----BEGIN CERTIFICATE-----"; then
         echo "inline"
         return 0
     fi
@@ -191,7 +206,7 @@ log_info "Installing certificate to system CA store"
 if [ ! -d /usr/local/share/ca-certificates ]; then
     log_info "Creating /usr/local/share/ca-certificates directory"
     log_debug "Directory does not exist, creating with sudo..."
-    sudo mkdir -p /usr/local/share/ca-certificates
+    run_privileged mkdir -p /usr/local/share/ca-certificates
 else
     log_debug "Directory /usr/local/share/ca-certificates already exists"
 fi
@@ -199,7 +214,7 @@ fi
 # Copy certificate
 SYSTEM_CERT_PATH="/usr/local/share/ca-certificates/$CERT_NAME"
 log_debug "Copying certificate to: $SYSTEM_CERT_PATH"
-sudo cp "$TEMP_CERT" "$SYSTEM_CERT_PATH"
+run_privileged cp "$TEMP_CERT" "$SYSTEM_CERT_PATH"
 log_info "Certificate copied to: $SYSTEM_CERT_PATH"
 
 # Verify copy
@@ -216,9 +231,9 @@ fi
 log_info "Updating system CA certificates"
 log_debug "Running update-ca-certificates..."
 if [ "$INPUT_VERBOSE" = "true" ]; then
-    sudo update-ca-certificates -v
+    run_privileged update-ca-certificates -v
 else
-    sudo update-ca-certificates
+    run_privileged update-ca-certificates
 fi
 
 log_info "System CA certificates updated successfully"

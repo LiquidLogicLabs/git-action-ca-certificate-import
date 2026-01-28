@@ -2,12 +2,19 @@ name: CI
 
 on:
   push:
+    paths-ignore: ['**/*.md']
     branches: ['**']
     tags-ignore: ['**']  # Ignore tag pushes (handled by release workflow)
   pull_request:
+    paths-ignore: ['**/*.md']
     branches: ['**']
   workflow_call:  # Allow CI to be called by release workflow
   workflow_dispatch:  # Allow manual triggering
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -43,4 +50,5 @@ jobs:
   test:
     needs: validate  # Tests run after validation
     uses: ./.github/workflows/test.yml
+    secrets: inherit
     # test.yml runs: all tests for composite action
