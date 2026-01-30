@@ -21,7 +21,7 @@ inputs:
     default: ''
   
   verbose:
-    description: 'Enable verbose debug logging'
+    description: 'Enable verbose debug logging. Also enabled when ACTIONS_STEP_DEBUG=true.'
     required: false
     default: 'false'
   
@@ -58,7 +58,7 @@ runs:
       env:
         INPUT_CERTIFICATE: ${{ inputs.certificate }}
         INPUT_CERTIFICATE_NAME: ${{ inputs.certificate-name }}
-        INPUT_VERBOSE: ${{ inputs.verbose }}
+        INPUT_VERBOSE: ${{ inputs.verbose == 'true' || env.ACTIONS_STEP_DEBUG == 'true' }}
         INPUT_GENERATE_BUILDKIT: ${{ inputs.generate-buildkit }}
         INPUT_BUILDKIT_RUNTIME: ${{ inputs.buildkit-runtime }}
 
