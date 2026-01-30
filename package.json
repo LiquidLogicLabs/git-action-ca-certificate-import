@@ -1,6 +1,6 @@
 {
   "name": "ca-certificate-import-action",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "GitHub Action for installing custom SSL/TLS certificates",
   "private": true,
   "repository": {
