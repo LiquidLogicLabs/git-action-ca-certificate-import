@@ -85,6 +85,15 @@ jobs:
           echo "📦 Package manifest created:"
           cat package-manifest.json
 
+      - name: Verify tracked scripts are unchanged
+        run: |
+          if ! git diff --quiet -- action.yml install-certificate.sh; then
+            echo "::error::action.yml or install-certificate.sh changed during validation."
+            git diff --stat -- action.yml install-certificate.sh
+            exit 1
+          fi
+          echo "Tracked scripts verified."
+
       - name: Generate release notes
         id: release_notes
         uses: mikepenz/release-changelog-builder-action@v6
