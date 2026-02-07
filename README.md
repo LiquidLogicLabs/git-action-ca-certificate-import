@@ -43,7 +43,7 @@ The action **auto-detects** the certificate source type (file path, URL, or inli
   uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
     certificate: ${{ secrets.CUSTOM_CA_CERT }}
-    certificate-name: 'company-ca.crt'
+    certificateName: 'company-ca.crt'
 ```
 
 ### With BuildKit Configuration
@@ -54,14 +54,14 @@ The action **auto-detects** the certificate source type (file path, URL, or inli
   uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
   with:
     certificate: 'certs/company-ca.crt'
-    generate-buildkit: 'true'
+    generateBuildkit: 'true'
 
 - name: Use buildkit.toml for Docker builds
   run: |
-    echo "buildkit.toml generated at: ${{ steps.install-cert.outputs.buildkit-path }}"
+    echo "buildkit.toml generated at: ${{ steps.install-cert.outputs.buildkitPath }}"
     # Copy to Docker BuildKit config directory
     mkdir -p ~/.docker/buildx
-    cp ${{ steps.install-cert.outputs.buildkit-path }} ~/.docker/buildx/config.toml
+    cp ${{ steps.install-cert.outputs.buildkitPath }} ~/.docker/buildx/config.toml
 ```
 
 📚 **More examples:** See [docs/EXAMPLES.md](docs/EXAMPLES.md)
@@ -71,18 +71,19 @@ The action **auto-detects** the certificate source type (file path, URL, or inli
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
 | `certificate` | Certificate source: auto-detects file path, URL, or inline content. See [Input Methods](#input-methods) below | Yes | - |
-| `certificate-name` | Name for certificate file | No | Auto-generated |
+| `certificateName` | Name for certificate file | No | Auto-generated |
 | `verbose` | Enable verbose debug logging | No | `false` |
-| `generate-buildkit` | Generate buildkit.toml configuration file | No | `false` |
-| `buildkit-runtime` | Container runtime for BuildKit (e.g., 'io.containerd.runc.v2'). Leave empty to omit runtime configuration | No | - |
+| `generateBuildkit` | Generate buildkit.toml configuration file | No | `false` |
+| `buildkitRuntime` | Container runtime for BuildKit (e.g., 'io.containerd.runc.v2'). Leave empty to omit runtime configuration | No | - |
+| `skipCertificateCheck` | Skip TLS certificate verification when downloading certificates from URLs | No | `false` |
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `certificate-path` | Path where certificate was installed |
-| `certificate-name` | Name of the installed certificate file |
-| `buildkit-path` | Path to the generated buildkit.toml file (only set if generate-buildkit is true) |
+| `certificatePath` | Path where certificate was installed |
+| `certificateName` | Name of the installed certificate file |
+| `buildkitPath` | Path to the generated buildkit.toml file (only set if generateBuildkit is true) |
 
 ## How It Works
 
