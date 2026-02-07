@@ -55,6 +55,7 @@ if [ "$INPUT_VERBOSE" = "true" ]; then
     log_debug "  INPUT_CERTIFICATE_NAME: ${INPUT_CERTIFICATE_NAME:-<not set>}"
     log_debug "  INPUT_VERBOSE: ${INPUT_VERBOSE}"
     log_debug "  INPUT_GENERATE_BUILDKIT: ${INPUT_GENERATE_BUILDKIT:-<not set>}"
+    log_debug "  INPUT_SKIP_CERTIFICATE_CHECK: ${INPUT_SKIP_CERTIFICATE_CHECK:-<not set>}"
     log_debug "  Working Directory: $(pwd)"
     log_debug "  User: $(whoami 2>/dev/null || echo '<unknown>')"
     log_debug "  Runner OS: ${RUNNER_OS:-<not set>}"
@@ -123,8 +124,13 @@ case "$CERT_TYPE" in
         log_info "Auto-detected: URL source"
         log_info "Downloading certificate from: $INPUT_CERTIFICATE"
         log_debug "Using curl to download certificate..."
+        CURL_FLAGS="-fsSL"
+        if [ "$INPUT_SKIP_CERTIFICATE_CHECK" = "true" ]; then
+            log_warn "TLS certificate verification is disabled. This is a security risk and should only be used with trusted endpoints."
+            CURL_FLAGS="$CURL_FLAGS -k"
+        fi
         
-        if ! curl -fsSL -o "$TEMP_CERT" "$INPUT_CERTIFICATE"; then
+        if ! curl $CURL_FLAGS -o "$TEMP_CERT" "$INPUT_CERTIFICATE"; then
             log_error "Failed to download certificate from URL: $INPUT_CERTIFICATE"
             log_error "Please verify the URL is accessible and correct"
             rm -rf "$TEMP_DIR"
@@ -291,17 +297,17 @@ EOF
     fi
     
     # Set buildkit path output
-    echo "buildkit-path=$(pwd)/$BUILDKIT_PATH" >> $GITHUB_OUTPUT
-    log_debug "Output set: buildkit-path=$(pwd)/$BUILDKIT_PATH"
+    echo "buildkitPath=$(pwd)/$BUILDKIT_PATH" >> $GITHUB_OUTPUT
+    log_debug "Output set: buildkitPath=$(pwd)/$BUILDKIT_PATH"
 else
     log_debug "buildkit.toml generation disabled (INPUT_GENERATE_BUILDKIT=false)"
 fi
 
 # Set outputs
 log_debug "Setting GitHub Action outputs..."
-echo "certificate-path=$SYSTEM_CERT_PATH" >> $GITHUB_OUTPUT
-echo "certificate-name=$CERT_NAME" >> $GITHUB_OUTPUT
-log_debug "Outputs set: certificate-path=$SYSTEM_CERT_PATH, certificate-name=$CERT_NAME"
+echo "certificatePath=$SYSTEM_CERT_PATH" >> $GITHUB_OUTPUT
+echo "certificateName=$CERT_NAME" >> $GITHUB_OUTPUT
+log_debug "Outputs set: certificatePath=$SYSTEM_CERT_PATH, certificateName=$CERT_NAME"
 
 # Cleanup
 log_debug "Cleaning up temporary directory: $TEMP_DIR"

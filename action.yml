@@ -15,7 +15,7 @@ inputs:
       - Inline: contains -----BEGIN CERTIFICATE----- markers (e.g., from secrets)
     required: true
   
-  certificate-name:
+  certificateName:
     description: 'Name for the certificate file (auto-generated if not specified)'
     required: false
     default: ''
@@ -25,28 +25,33 @@ inputs:
     required: false
     default: 'false'
   
-  generate-buildkit:
+  generateBuildkit:
     description: 'Generate buildkit.toml configuration file with CA certificate settings'
     required: false
     default: 'false'
   
-  buildkit-runtime:
+  buildkitRuntime:
     description: 'Container runtime for BuildKit (e.g., "io.containerd.runc.v2"). Leave empty to omit runtime configuration'
     required: false
     default: ''
 
+  skipCertificateCheck:
+    description: 'Skip TLS certificate verification when downloading certificates from URLs'
+    required: false
+    default: 'false'
+
 outputs:
-  certificate-path:
+  certificatePath:
     description: 'Path where the certificate was installed'
-    value: ${{ steps.install-cert.outputs.certificate-path }}
+    value: ${{ steps.install-cert.outputs.certificatePath }}
   
-  certificate-name:
+  certificateName:
     description: 'Name of the installed certificate file'
-    value: ${{ steps.install-cert.outputs.certificate-name }}
+    value: ${{ steps.install-cert.outputs.certificateName }}
   
-  buildkit-path:
+  buildkitPath:
     description: 'Path to the generated buildkit.toml file (only set if generate-buildkit is true)'
-    value: ${{ steps.install-cert.outputs.buildkit-path }}
+    value: ${{ steps.install-cert.outputs.buildkitPath }}
 
 runs:
   using: 'composite'
@@ -57,8 +62,9 @@ runs:
       run: ${{ github.action_path }}/install-certificate.sh
       env:
         INPUT_CERTIFICATE: ${{ inputs.certificate }}
-        INPUT_CERTIFICATE_NAME: ${{ inputs.certificate-name }}
+        INPUT_CERTIFICATE_NAME: ${{ inputs.certificateName }}
         INPUT_VERBOSE: ${{ inputs.verbose == 'true' || env.ACTIONS_STEP_DEBUG == 'true' }}
-        INPUT_GENERATE_BUILDKIT: ${{ inputs.generate-buildkit }}
-        INPUT_BUILDKIT_RUNTIME: ${{ inputs.buildkit-runtime }}
+        INPUT_GENERATE_BUILDKIT: ${{ inputs.generateBuildkit }}
+        INPUT_BUILDKIT_RUNTIME: ${{ inputs.buildkitRuntime }}
+        INPUT_SKIP_CERTIFICATE_CHECK: ${{ inputs.skipCertificateCheck }}
 
