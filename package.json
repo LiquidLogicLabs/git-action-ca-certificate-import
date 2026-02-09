@@ -8,9 +8,9 @@
     "url": "https://github.com/LiquidLogicLabs/git-action-ca-certificate-import.git"
   },
   "scripts": {
-    "release:patch": "standard-version --release-as patch --skip.changelog && git push --follow-tags",
-    "release:minor": "standard-version --release-as minor --skip.changelog && git push --follow-tags",
-    "release:major": "standard-version --release-as major --skip.changelog && git push --follow-tags",
+    "release:patch": "standard-version --release-as patch --skip.changelog && npm run release:push",
+    "release:minor": "standard-version --release-as minor --skip.changelog && npm run release:push",
+    "release:major": "standard-version --release-as major --skip.changelog && npm run release:push",
     "build": "echo 'Build completed - action is ready for packaging'",
     "test:act": "act --env-file .act.env --var-file .act.vars --secret-file .act.secrets workflow_dispatch -W .github/workflows/test.yml --eventpath .github/workflows/.act/event-workflow_call.json",
     "test:act:verbose": "act --env-file .act.env --var-file .act.vars --secret-file .act.secrets workflow_dispatch -W .github/workflows/test.yml --eventpath .github/workflows/.act/event-workflow_call.json -v",

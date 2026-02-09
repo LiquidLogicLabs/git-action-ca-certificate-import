@@ -85,6 +85,10 @@ The action **auto-detects** the certificate source type (file path, URL, or inli
 | `certificate-name` | Name of the installed certificate file |
 | `buildkit-path` | Path to the generated buildkit.toml file (only set if generate-buildkit is true) |
 
+## Permissions
+
+No special permissions are required. Typical workflows need `contents: read` for checkout.
+
 ## How It Works
 
 1. **Auto-Detects Source**: Automatically detects if input is a URL, file path, or inline content
