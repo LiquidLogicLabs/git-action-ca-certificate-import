@@ -297,17 +297,17 @@ EOF
     fi
     
     # Set buildkit path output
-    echo "buildkitPath=$(pwd)/$BUILDKIT_PATH" >> $GITHUB_OUTPUT
-    log_debug "Output set: buildkitPath=$(pwd)/$BUILDKIT_PATH"
+    echo "buildkit-path=$(pwd)/$BUILDKIT_PATH" >> $GITHUB_OUTPUT
+    log_debug "Output set: buildkit-path=$(pwd)/$BUILDKIT_PATH"
 else
     log_debug "buildkit.toml generation disabled (INPUT_GENERATE_BUILDKIT=false)"
 fi
 
 # Set outputs
 log_debug "Setting GitHub Action outputs..."
-echo "certificatePath=$SYSTEM_CERT_PATH" >> $GITHUB_OUTPUT
-echo "certificateName=$CERT_NAME" >> $GITHUB_OUTPUT
-log_debug "Outputs set: certificatePath=$SYSTEM_CERT_PATH, certificateName=$CERT_NAME"
+echo "certificate-path=$SYSTEM_CERT_PATH" >> $GITHUB_OUTPUT
+echo "certificate-name=$CERT_NAME" >> $GITHUB_OUTPUT
+log_debug "Outputs set: certificate-path=$SYSTEM_CERT_PATH, certificate-name=$CERT_NAME"
 
 # Cleanup
 log_debug "Cleaning up temporary directory: $TEMP_DIR"

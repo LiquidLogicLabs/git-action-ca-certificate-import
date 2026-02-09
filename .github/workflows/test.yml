@@ -42,7 +42,7 @@ jobs:
         uses: ./
         with:
           certificate: 'test-certs/test-ca.crt'
-          certificateName: 'local-file-test.crt'
+          certificate-name: 'local-file-test.crt'
           verbose: 'true'
       
       - name: Verify local file installation
@@ -56,8 +56,8 @@ jobs:
           fi
           
           # Verify outputs
-          CERT_PATH="${{ steps.local-file-test.outputs.certificatePath }}"
-          CERT_NAME="${{ steps.local-file-test.outputs.certificateName }}"
+          CERT_PATH="${{ steps.local-file-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.local-file-test.outputs.certificate-name }}"
           
           if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/local-file-test.crt" ]; then
             echo "✗ certificate-path output incorrect: $CERT_PATH"
@@ -79,15 +79,15 @@ jobs:
         uses: ./
         with:
           certificate: 'test-certs/test-ca.crt'
-          certificateName: 'buildkit-test.crt'
-          generateBuildkit: 'true'
+          certificate-name: 'buildkit-test.crt'
+          generate-buildkit: 'true'
           verbose: 'true'
       
       - name: Verify BuildKit generation
         run: |
-          BUILDKIT_PATH="${{ steps.buildkit-test.outputs.buildkitPath }}"
-          CERT_PATH="${{ steps.buildkit-test.outputs.certificatePath }}"
-          CERT_NAME="${{ steps.buildkit-test.outputs.certificateName }}"
+          BUILDKIT_PATH="${{ steps.buildkit-test.outputs.buildkit-path }}"
+          CERT_PATH="${{ steps.buildkit-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.buildkit-test.outputs.certificate-name }}"
           
           # Verify buildkit-path output
           if [ -f "$BUILDKIT_PATH" ]; then
@@ -136,16 +136,16 @@ jobs:
         uses: ./
         with:
           certificate: 'test-certs/test-ca.crt'
-          certificateName: 'buildkit-runtime-test.crt'
-          generateBuildkit: 'true'
-          buildkitRuntime: 'io.containerd.runc.v2'
+          certificate-name: 'buildkit-runtime-test.crt'
+          generate-buildkit: 'true'
+          buildkit-runtime: 'io.containerd.runc.v2'
           verbose: 'true'
       
       - name: Verify BuildKit generation with runtime
         run: |
-          BUILDKIT_PATH="${{ steps.buildkit-runtime-test.outputs.buildkitPath }}"
-          CERT_PATH="${{ steps.buildkit-runtime-test.outputs.certificatePath }}"
-          CERT_NAME="${{ steps.buildkit-runtime-test.outputs.certificateName }}"
+          BUILDKIT_PATH="${{ steps.buildkit-runtime-test.outputs.buildkit-path }}"
+          CERT_PATH="${{ steps.buildkit-runtime-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.buildkit-runtime-test.outputs.certificate-name }}"
           
           # Verify buildkit-path output
           if [ -f "$BUILDKIT_PATH" ]; then
@@ -207,7 +207,7 @@ jobs:
         uses: ./
         with:
           certificate: ${{ vars.TEST_CERTIFICATE_URL }}
-          certificateName: 'url-cert-test.crt'
+          certificate-name: 'url-cert-test.crt'
           verbose: 'true'
       
       - name: Verify URL-based installation
@@ -222,8 +222,8 @@ jobs:
           fi
           
           # Verify outputs
-          CERT_PATH="${{ steps.url-test.outputs.certificatePath }}"
-          CERT_NAME="${{ steps.url-test.outputs.certificateName }}"
+          CERT_PATH="${{ steps.url-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.url-test.outputs.certificate-name }}"
           
           if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/url-cert-test.crt" ]; then
             echo "✗ certificate-path output incorrect: $CERT_PATH"
@@ -265,12 +265,12 @@ jobs:
           
           # The script writes outputs to $GITHUB_OUTPUT automatically
           # Verify outputs were set (script should have written them)
-          if [ -f "$GITHUB_OUTPUT" ] && grep -q "certificatePath=" "$GITHUB_OUTPUT" && grep -q "certificateName=" "$GITHUB_OUTPUT"; then
+          if [ -f "$GITHUB_OUTPUT" ] && grep -q "certificate-path=" "$GITHUB_OUTPUT" && grep -q "certificate-name=" "$GITHUB_OUTPUT"; then
             echo "✓ Script outputs verified in GITHUB_OUTPUT"
           else
             # Fallback: set expected outputs (shouldn't be needed, but ensures test continues)
-            echo "certificatePath=/usr/local/share/ca-certificates/inline-cert-test.crt" >> $GITHUB_OUTPUT
-            echo "certificateName=inline-cert-test.crt" >> $GITHUB_OUTPUT
+            echo "certificate-path=/usr/local/share/ca-certificates/inline-cert-test.crt" >> $GITHUB_OUTPUT
+            echo "certificate-name=inline-cert-test.crt" >> $GITHUB_OUTPUT
             echo "⚠ Note: Script outputs not found, using fallback values"
           fi
       
@@ -285,8 +285,8 @@ jobs:
           fi
           
           # Verify outputs
-          CERT_PATH="${{ steps.inline-test.outputs.certificatePath }}"
-          CERT_NAME="${{ steps.inline-test.outputs.certificateName }}"
+          CERT_PATH="${{ steps.inline-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.inline-test.outputs.certificate-name }}"
           
           if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/inline-cert-test.crt" ]; then
             echo "✗ certificate-path output incorrect: $CERT_PATH"
@@ -313,8 +313,8 @@ jobs:
       - name: Verify auto-generated certificate name
         run: |
           # Get outputs
-          CERT_PATH="${{ steps.auto-name-test.outputs.certificatePath }}"
-          CERT_NAME="${{ steps.auto-name-test.outputs.certificateName }}"
+          CERT_PATH="${{ steps.auto-name-test.outputs.certificate-path }}"
+          CERT_NAME="${{ steps.auto-name-test.outputs.certificate-name }}"
           
           # Verify certificate-name follows expected pattern (custom-ca-*.crt)
           if [[ ! "$CERT_NAME" =~ ^custom-ca-[0-9]+\.crt$ ]]; then
