@@ -13,7 +13,8 @@ on:
 
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref }}
+  # Same group for same release whether triggered by push (tag) or workflow_dispatch (inputs.tag)
+  group: ${{ github.workflow || 'Release' }}-${{ github.event.inputs.tag || github.ref_name || github.ref || github.run_id }}
   cancel-in-progress: false
 
 permissions:
@@ -39,7 +40,7 @@ jobs:
 
       - name: Parse and validate version tag
         id: version
-        uses: LiquidLogicLabs/git-tag-validate-version-action@v1
+        uses: LiquidLogicLabs/git-tag-validate-version-action@v2
         with:
           tag: ${{ github.event.inputs.tag || github.ref_name }}
           version-type: 'auto'
@@ -99,7 +100,7 @@ jobs:
         uses: mikepenz/release-changelog-builder-action@v6
         with:
           mode: "HYBRID"
-          configuration-json: |
+          configurationJson: |
             {
               "template": "#{{CHANGELOG}}\n\n<details>\n<summary>Pull Requests</summary>\n\n#{{PR_LIST}}\n</details>\n\n---\n\n### Usage\n\n```yaml\n- uses: LiquidLogicLabs/git-action-ca-certificate-import@${{ github.ref_name }}\n  with:\n    certificate: 'path/to/cert.crt'  # Auto-detects: file path, URL, or inline content\n```\n\n### Installation\n\nThe certificate will be installed to the system CA store and trusted by:\n- ✅ Docker (push/pull from registries with custom certs)\n- ✅ curl, wget, and other HTTP clients\n- ✅ pip, npm, apt, and other package managers\n- ✅ Git operations over HTTPS\n- ✅ Any tool that uses the system CA store"
             }
@@ -108,14 +109,14 @@ jobs:
 
       - name: Create/Update Major, Minor, and Latest Version Tags
         if: steps.version.outputs.has-prerelease != 'true' && steps.version.outputs.is-valid == 'true'
-        uses: LiquidLogicLabs/git-floating-version-tags-action@v1
+        uses: LiquidLogicLabs/git-floating-version-tags-action@v2
         with:
           tag: ${{ github.event.inputs.tag || github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
-        uses: LiquidLogicLabs/git-action-release@v1
+        uses: LiquidLogicLabs/git-action-release@v2
         with:
           tag: ${{ github.event.inputs.tag || github.ref_name }}
           name: Release ${{ steps.version.outputs.version }}

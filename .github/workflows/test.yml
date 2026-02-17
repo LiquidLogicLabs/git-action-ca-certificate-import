@@ -9,7 +9,7 @@ concurrency:
   # NOTE: For workflow_call, GitHub can detect a concurrency deadlock if the callee
   # shares the same group as the caller. Use an explicit prefix here to ensure
   # this workflow never collides with the top-level CI workflow group.
-  group: Test-${{ github.event.pull_request.number || github.ref }}
+  group: Test-${{ github.event.pull_request.number || github.ref || github.sha }}
   cancel-in-progress: true
 
 permissions:
