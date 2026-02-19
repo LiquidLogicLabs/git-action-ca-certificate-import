@@ -48,5 +48,8 @@ yarn-error.log*
 # Local dev (act)
 .env
 .env.*
+
+# Devcontainer secrets — copy of .devcontainer/.devcontainer-secrets.sample with real values
+.devcontainer-secrets
 .secrets.*
 .actrc.local
