@@ -323,7 +323,7 @@ When contributing, keep documentation up to date:
 
 ## Releasing
 
-This project uses [`standard-version`](https://github.com/conventional-changelog/standard-version) for automated release tag creation with commit summaries.
+This project uses npm lifecycle hooks (`version`/`postversion`) with `conventional-changelog-cli` for versioning and changelog generation.
 
 ### Pre-Release Checklist
 
@@ -362,11 +362,12 @@ npm run release:major
 
 ### What Happens
 
-The release command automatically:
+The release command triggers `npm version` which automatically:
 1. Bumps the version in `package.json` (patch/minor/major)
-2. Creates a git commit with the version bump
-3. Creates a git tag with the version number
-4. Pushes the tag and commit to trigger the GitHub Actions release workflow
+2. Updates CHANGELOG.md from conventional commits via the `version` hook
+3. Creates a git commit with message like "chore(release): 1.0.1"
+4. Creates a git tag (e.g., `v1.0.1`)
+5. Pushes the tag and commit to trigger the GitHub Actions release workflow via the `postversion` hook
 
 The release workflow then:
 - Runs tests as a safety check
