@@ -25,7 +25,7 @@ This guide helps resolve common issues when using the CA Certificate Import Acti
 **Example Fix:**
 ```yaml
 - name: Checkout code
-  uses: actions/checkout@v4  # Must run before using file paths
+  uses: actions/checkout@v6  # Must run before using file paths
 
 - name: Install certificate
   uses: LiquidLogicLabs/git-action-ca-certificate-import@v2

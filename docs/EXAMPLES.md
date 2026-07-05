@@ -116,7 +116,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Install custom CA certificate
         uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
@@ -157,7 +157,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Install certificate from URL
         uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
@@ -203,7 +203,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Install custom CA for internal PyPI
         uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
@@ -239,7 +239,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Install custom CA for internal npm
         uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
@@ -247,9 +247,9 @@ jobs:
           certificate: 'https://pki.company.com/npm-ca.crt'
       
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://npm.internal.company.com'
       
       - name: Install dependencies
@@ -273,7 +273,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Install custom CA certificate
         uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
@@ -407,7 +407,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       # Install corporate CA certificate
       - name: Install corporate CA
@@ -457,7 +457,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Install certificate and generate buildkit.toml
         id: cert-install
