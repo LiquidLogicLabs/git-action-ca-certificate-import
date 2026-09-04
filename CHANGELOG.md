@@ -1,3 +1,12 @@
+## [3.0.4](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/compare/v3.0.3...v3.0.4) (2026-09-04)
+
+
+### Bug Fixes
+
+* validate composite inputs before they reach a privileged write or a config file ([1bbbff8](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/commit/1bbbff8f4ec3f3d6658106e8182a01755d8248aa))
+
+
+
 ## [3.0.3](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/compare/v3.0.2...v3.0.3) (2026-07-05)
 
 
