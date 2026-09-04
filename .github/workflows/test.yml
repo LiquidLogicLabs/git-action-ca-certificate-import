@@ -25,8 +25,10 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          # No step in this job pushes; the credential is not needed.
+          persist-credentials: false
           fetch-depth: 0
       
       # Test 1: Local file installation
@@ -39,13 +41,16 @@ jobs:
       
       - name: Test - Local file installation
         id: local-file-test
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           certificate: 'test-certs/test-ca.crt'
           certificate-name: 'local-file-test.crt'
           verbose: 'true'
       
       - name: Verify local file installation
+        env:
+          Z_LOCAL_FILE_TEST_OUTPUTS_CERTIFICATE_PATH: ${{ steps.local-file-test.outputs.certificate-path }}
+          Z_LOCAL_FILE_TEST_OUTPUTS_CERTIFICATE_NAME: ${{ steps.local-file-test.outputs.certificate-name }}
         run: |
           # Verify certificate file exists
           if [ -f /usr/local/share/ca-certificates/local-file-test.crt ]; then
@@ -56,8 +61,8 @@ jobs:
           fi
           
           # Verify outputs
-          CERT_PATH="${{ steps.local-file-test.outputs.certificate-path }}"
-          CERT_NAME="${{ steps.local-file-test.outputs.certificate-name }}"
+          CERT_PATH="${Z_LOCAL_FILE_TEST_OUTPUTS_CERTIFICATE_PATH}"
+          CERT_NAME="${Z_LOCAL_FILE_TEST_OUTPUTS_CERTIFICATE_NAME}"
           
           if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/local-file-test.crt" ]; then
             echo "✗ certificate-path output incorrect: $CERT_PATH"
@@ -76,7 +81,7 @@ jobs:
       # Test 2: BuildKit generation
       - name: Test - BuildKit generation
         id: buildkit-test
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           certificate: 'test-certs/test-ca.crt'
           certificate-name: 'buildkit-test.crt'
@@ -84,10 +89,14 @@ jobs:
           verbose: 'true'
       
       - name: Verify BuildKit generation
+        env:
+          Z_BUILDKIT_TEST_OUTPUTS_BUILDKIT_PATH: ${{ steps.buildkit-test.outputs.buildkit-path }}
+          Z_BUILDKIT_TEST_OUTPUTS_CERTIFICATE_PATH: ${{ steps.buildkit-test.outputs.certificate-path }}
+          Z_BUILDKIT_TEST_OUTPUTS_CERTIFICATE_NAME: ${{ steps.buildkit-test.outputs.certificate-name }}
         run: |
-          BUILDKIT_PATH="${{ steps.buildkit-test.outputs.buildkit-path }}"
-          CERT_PATH="${{ steps.buildkit-test.outputs.certificate-path }}"
-          CERT_NAME="${{ steps.buildkit-test.outputs.certificate-name }}"
+          BUILDKIT_PATH="${Z_BUILDKIT_TEST_OUTPUTS_BUILDKIT_PATH}"
+          CERT_PATH="${Z_BUILDKIT_TEST_OUTPUTS_CERTIFICATE_PATH}"
+          CERT_NAME="${Z_BUILDKIT_TEST_OUTPUTS_CERTIFICATE_NAME}"
           
           # Verify buildkit-path output
           if [ -f "$BUILDKIT_PATH" ]; then
@@ -133,7 +142,7 @@ jobs:
       # Test 3: BuildKit generation with custom runtime
       - name: Test - BuildKit generation with runtime
         id: buildkit-runtime-test
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           certificate: 'test-certs/test-ca.crt'
           certificate-name: 'buildkit-runtime-test.crt'
@@ -142,10 +151,14 @@ jobs:
           verbose: 'true'
       
       - name: Verify BuildKit generation with runtime
+        env:
+          Z_BUILDKIT_RUNTIME_TEST_OUTPUTS_BUILDKIT_PATH: ${{ steps.buildkit-runtime-test.outputs.buildkit-path }}
+          Z_BUILDKIT_RUNTIME_TEST_OUTPUTS_CERTIFICATE_PA: ${{ steps.buildkit-runtime-test.outputs.certificate-path }}
+          Z_BUILDKIT_RUNTIME_TEST_OUTPUTS_CERTIFICATE_NA: ${{ steps.buildkit-runtime-test.outputs.certificate-name }}
         run: |
-          BUILDKIT_PATH="${{ steps.buildkit-runtime-test.outputs.buildkit-path }}"
-          CERT_PATH="${{ steps.buildkit-runtime-test.outputs.certificate-path }}"
-          CERT_NAME="${{ steps.buildkit-runtime-test.outputs.certificate-name }}"
+          BUILDKIT_PATH="${Z_BUILDKIT_RUNTIME_TEST_OUTPUTS_BUILDKIT_PATH}"
+          CERT_PATH="${Z_BUILDKIT_RUNTIME_TEST_OUTPUTS_CERTIFICATE_PA}"
+          CERT_NAME="${Z_BUILDKIT_RUNTIME_TEST_OUTPUTS_CERTIFICATE_NA}"
           
           # Verify buildkit-path output
           if [ -f "$BUILDKIT_PATH" ]; then
@@ -189,22 +202,29 @@ jobs:
           echo "  buildkit-path: $BUILDKIT_PATH"
       
       # Test 4: URL-based certificate source
-      - name: Set TEST_CERTIFICATE_URL env var
+      # Hoisting the expression out of the run: block produced a SECOND `env:` key on this
+      # step, because the pre-existing one sat below `run:`. YAML takes the last and drops
+      # the other silently; actionlint is what caught it. The two are merged here.
+      - name: Decide whether the URL test can run
         id: url-env
-        run: |
-          if [ -n "${{ vars.TEST_CERTIFICATE_URL }}" ]; then
-            echo "url_set=true" >> $GITHUB_OUTPUT
-            echo "${{ vars.TEST_CERTIFICATE_URL }}" >> $GITHUB_ENV
-          else
-            echo "url_set=false" >> $GITHUB_OUTPUT
-          fi
         env:
-          TEST_CERTIFICATE_URL_VAR: ${{ vars.TEST_CERTIFICATE_URL }}
+          Z_VARS_TEST_CERTIFICATE_URL: ${{ vars.TEST_CERTIFICATE_URL }}
+        run: |
+          if [ -n "${Z_VARS_TEST_CERTIFICATE_URL}" ]; then
+            echo "url_set=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "url_set=false" >> "$GITHUB_OUTPUT"
+          fi
+          # The `echo "$URL" >> "$GITHUB_ENV"` that used to sit here wrote a bare value with
+          # no `NAME=` -- GitHub rejects that line, so this step would have failed the job
+          # the first time TEST_CERTIFICATE_URL was actually set. Nothing read it back
+          # (the consumer below reads `vars.TEST_CERTIFICATE_URL` directly), and the
+          # likewise-unread `TEST_CERTIFICATE_URL_VAR` env entry went with it.
       
       - name: Test - URL-based certificate source
         id: url-test
         if: steps.url-env.outputs.url_set == 'true'
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           certificate: ${{ vars.TEST_CERTIFICATE_URL }}
           certificate-name: 'url-cert-test.crt'
@@ -212,6 +232,9 @@ jobs:
       
       - name: Verify URL-based installation
         if: steps.url-env.outputs.url_set == 'true'
+        env:
+          Z_URL_TEST_OUTPUTS_CERTIFICATE_PATH: ${{ steps.url-test.outputs.certificate-path }}
+          Z_URL_TEST_OUTPUTS_CERTIFICATE_NAME: ${{ steps.url-test.outputs.certificate-name }}
         run: |
           # Verify certificate file exists
           if [ -f /usr/local/share/ca-certificates/url-cert-test.crt ]; then
@@ -222,8 +245,8 @@ jobs:
           fi
           
           # Verify outputs
-          CERT_PATH="${{ steps.url-test.outputs.certificate-path }}"
-          CERT_NAME="${{ steps.url-test.outputs.certificate-name }}"
+          CERT_PATH="${Z_URL_TEST_OUTPUTS_CERTIFICATE_PATH}"
+          CERT_NAME="${Z_URL_TEST_OUTPUTS_CERTIFICATE_NAME}"
           
           if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/url-cert-test.crt" ]; then
             echo "✗ certificate-path output incorrect: $CERT_PATH"
@@ -269,12 +292,15 @@ jobs:
             echo "✓ Script outputs verified in GITHUB_OUTPUT"
           else
             # Fallback: set expected outputs (shouldn't be needed, but ensures test continues)
-            echo "certificate-path=/usr/local/share/ca-certificates/inline-cert-test.crt" >> $GITHUB_OUTPUT
-            echo "certificate-name=inline-cert-test.crt" >> $GITHUB_OUTPUT
+            echo "certificate-path=/usr/local/share/ca-certificates/inline-cert-test.crt" >> "$GITHUB_OUTPUT"
+            echo "certificate-name=inline-cert-test.crt" >> "$GITHUB_OUTPUT"
             echo "⚠ Note: Script outputs not found, using fallback values"
           fi
       
       - name: Verify inline certificate installation
+        env:
+          Z_INLINE_TEST_OUTPUTS_CERTIFICATE_PATH: ${{ steps.inline-test.outputs.certificate-path }}
+          Z_INLINE_TEST_OUTPUTS_CERTIFICATE_NAME: ${{ steps.inline-test.outputs.certificate-name }}
         run: |
           # Verify certificate file exists
           if [ -f /usr/local/share/ca-certificates/inline-cert-test.crt ]; then
@@ -285,8 +311,8 @@ jobs:
           fi
           
           # Verify outputs
-          CERT_PATH="${{ steps.inline-test.outputs.certificate-path }}"
-          CERT_NAME="${{ steps.inline-test.outputs.certificate-name }}"
+          CERT_PATH="${Z_INLINE_TEST_OUTPUTS_CERTIFICATE_PATH}"
+          CERT_NAME="${Z_INLINE_TEST_OUTPUTS_CERTIFICATE_NAME}"
           
           if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/inline-cert-test.crt" ]; then
             echo "✗ certificate-path output incorrect: $CERT_PATH"
@@ -305,16 +331,19 @@ jobs:
       # Test 6: Auto-generated certificate name
       - name: Test - Auto-generated certificate name
         id: auto-name-test
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           certificate: 'test-certs/test-ca.crt'
           verbose: 'true'
       
       - name: Verify auto-generated certificate name
+        env:
+          Z_AUTO_NAME_TEST_OUTPUTS_CERTIFICATE_PATH: ${{ steps.auto-name-test.outputs.certificate-path }}
+          Z_AUTO_NAME_TEST_OUTPUTS_CERTIFICATE_NAME: ${{ steps.auto-name-test.outputs.certificate-name }}
         run: |
           # Get outputs
-          CERT_PATH="${{ steps.auto-name-test.outputs.certificate-path }}"
-          CERT_NAME="${{ steps.auto-name-test.outputs.certificate-name }}"
+          CERT_PATH="${Z_AUTO_NAME_TEST_OUTPUTS_CERTIFICATE_PATH}"
+          CERT_NAME="${Z_AUTO_NAME_TEST_OUTPUTS_CERTIFICATE_NAME}"
           
           # Verify certificate-name follows expected pattern (custom-ca-*.crt)
           if [[ ! "$CERT_NAME" =~ ^custom-ca-[0-9]+\.crt$ ]]; then
@@ -389,7 +418,7 @@ jobs:
 
       - name: Test - step outputs survive a newline in the value
         run: |
-          # `echo "name=$V" >> $GITHUB_OUTPUT` lets a newline in $V start a second
+          # `echo "name=$V" >> "$GITHUB_OUTPUT"` lets a newline in $V start a second
           # assignment and set any other output. write_output uses a random delimiter.
           out_file=$(mktemp)
           GITHUB_OUTPUT="$out_file" INPUT_CERTIFICATE='test-certs/test-ca.crt' \

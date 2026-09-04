@@ -59,8 +59,14 @@ runs:
     - name: Install certificate
       id: install-cert
       shell: bash
-      run: ${{ github.action_path }}/install-certificate.sh
+      # github.action_path goes through env: rather than being expanded into the run:
+      # block. Expanded inline it is substituted as literal text before bash parses the
+      # line, so any shell metacharacter (a space in the checkout path is enough) changes
+      # what runs. zizmor flags this one only under --persona=auditor, but the rule is the
+      # same: an expression never reaches a run: block directly.
+      run: "$Z_ACTION_PATH/install-certificate.sh"
       env:
+        Z_ACTION_PATH: ${{ github.action_path }}
         INPUT_CERTIFICATE: ${{ inputs.certificate }}
         INPUT_CERTIFICATE_NAME: ${{ inputs.certificate-name }}
         INPUT_VERBOSE: ${{ inputs.verbose == 'true' || env.ACTIONS_STEP_DEBUG == 'true' }}
