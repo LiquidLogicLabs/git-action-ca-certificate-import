@@ -343,6 +343,62 @@ jobs:
           echo "  certificate-path: $CERT_PATH"
           echo "  certificate-name: $CERT_NAME"
       
+      # These run the script directly rather than through `uses: ./`, because a composite
+      # step that exits non-zero fails the job — and here a non-zero exit is the PASS.
+      # They run on a disposable runner; do not run them on a workstation, the script
+      # copies into the system trust store with sudo.
+      - name: Test - rejects a traversing certificate-name
+        env:
+          INPUT_CERTIFICATE: test-certs/test-ca.crt
+          INPUT_CERTIFICATE_NAME: '../../../../etc/sudoers.d/pwn'
+          INPUT_VERBOSE: 'false'
+          INPUT_GENERATE_BUILDKIT: 'false'
+        run: |
+          set +e
+          out=$(bash ./install-certificate.sh 2>&1); rc=$?
+          set -e
+          echo "$out"
+          test "$rc" -ne 0 || { echo "::error::traversing certificate-name was accepted"; exit 1; }
+          echo "$out" | grep -q 'must be a bare filename' \
+            || { echo "::error::rejected, but not by the name guard"; exit 1; }
+          test ! -e /etc/sudoers.d/pwn || { echo "::error::the traversal wrote a file"; exit 1; }
+          echo "✓ traversing certificate-name refused, nothing written"
+
+      - name: Test - rejects a buildkit-runtime that would inject TOML
+        env:
+          INPUT_CERTIFICATE: test-certs/test-ca.crt
+          INPUT_CERTIFICATE_NAME: 'toml-guard.crt'
+          INPUT_GENERATE_BUILDKIT: 'true'
+          INPUT_BUILDKIT_RUNTIME: |
+            runc"
+            [[worker.oci.registry]]
+              mirrors = ["evil.example.com"]
+            x = "
+          INPUT_VERBOSE: 'false'
+        run: |
+          set +e
+          out=$(bash ./install-certificate.sh 2>&1); rc=$?
+          set -e
+          echo "$out"
+          test "$rc" -ne 0 || { echo "::error::TOML-injecting buildkit-runtime was accepted"; exit 1; }
+          echo "$out" | grep -q 'may contain only letters' \
+            || { echo "::error::rejected, but not by the runtime guard"; exit 1; }
+          ! grep -q 'evil.example.com' buildkit.toml 2>/dev/null \
+            || { echo "::error::the injected registry mirror reached buildkit.toml"; exit 1; }
+          echo "✓ TOML-injecting buildkit-runtime refused"
+
+      - name: Test - step outputs survive a newline in the value
+        run: |
+          # `echo "name=$V" >> $GITHUB_OUTPUT` lets a newline in $V start a second
+          # assignment and set any other output. write_output uses a random delimiter.
+          out_file=$(mktemp)
+          GITHUB_OUTPUT="$out_file" INPUT_CERTIFICATE='test-certs/test-ca.crt' \
+          INPUT_CERTIFICATE_NAME='newline-guard.crt' INPUT_VERBOSE='false' \
+          INPUT_GENERATE_BUILDKIT='false' bash ./install-certificate.sh >/dev/null 2>&1
+          grep -q 'certificate-name<<EOF_' "$out_file" \
+            || { echo "::error::outputs are not written with a random delimiter"; cat "$out_file"; exit 1; }
+          echo "✓ outputs written via random heredoc delimiter"
+
       - name: Test Summary
         run: |
           echo ""

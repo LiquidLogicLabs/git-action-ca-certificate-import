@@ -100,7 +100,32 @@ detect_certificate_type() {
 }
 
 # Determine certificate name
+# Write a step output using a random heredoc delimiter.
+#
+# `echo "name=$VALUE" >> $GITHUB_OUTPUT` lets a newline in $VALUE start a second assignment
+# and set any other output. The delimiter is randomised so a value cannot close the block by
+# containing the delimiter itself. $GITHUB_OUTPUT is quoted (SC2086).
+write_output() {
+    _wo_name="$1"
+    _wo_value="$2"
+    _wo_delim="EOF_$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+    {
+        printf '%s<<%s\n' "$_wo_name" "$_wo_delim"
+        printf '%s\n' "$_wo_value"
+        printf '%s\n' "$_wo_delim"
+    } >> "$GITHUB_OUTPUT"
+}
+
 CERT_NAME="$INPUT_CERTIFICATE_NAME"
+# The name becomes a path segment under /usr/local/share/ca-certificates and is copied there
+# with sudo, so a traversing value is a root-privileged write to an arbitrary path. Reject
+# separators and dot segments rather than trying to sanitise them.
+case "$CERT_NAME" in
+    */*|*\\*|.|..)
+        log_error "certificate-name must be a bare filename: got '$CERT_NAME'"
+        exit 1
+        ;;
+esac
 if [ -z "$CERT_NAME" ]; then
     CERT_NAME="custom-ca-$(date +%s).crt"
     log_info "No certificate name provided, using: $CERT_NAME"
@@ -130,6 +155,9 @@ case "$CERT_TYPE" in
             CURL_FLAGS="$CURL_FLAGS -k"
         fi
         
+        # shellcheck disable=SC2086  # CURL_FLAGS is built locally above from literals
+        # ("-fsSL", plus "-k" when skip-certificate-check is set) and must word-split into
+        # separate arguments. It is never attacker-influenced.
         if ! curl $CURL_FLAGS -o "$TEMP_CERT" "$INPUT_CERTIFICATE"; then
             log_error "Failed to download certificate from URL: $INPUT_CERTIFICATE"
             log_error "Please verify the URL is accessible and correct"
@@ -279,6 +307,16 @@ EOF
 
     # Add runtime configuration only if specified
     if [ -n "$INPUT_BUILDKIT_RUNTIME" ]; then
+        # Interpolated inside a TOML double-quoted string. A quote in the value closes that
+        # string and the rest is parsed as TOML -- verified: a crafted value injects a
+        # [[worker.oci.registry]] mirror block, redirecting every image the build pulls.
+        # A runtime name is an identifier, so require that shape instead of escaping.
+        case "$INPUT_BUILDKIT_RUNTIME" in
+            *[!A-Za-z0-9._/-]*)
+                log_error "buildkit-runtime may contain only letters, digits, dot, underscore, slash and hyphen: got '$INPUT_BUILDKIT_RUNTIME'"
+                exit 1
+                ;;
+        esac
         cat >> "$BUILDKIT_PATH" << EOF
 
 # Container runtime configuration
@@ -299,7 +337,7 @@ EOF
     fi
     
     # Set buildkit path output
-    echo "buildkit-path=$(pwd)/$BUILDKIT_PATH" >> $GITHUB_OUTPUT
+    write_output "buildkit-path" "$(pwd)/$BUILDKIT_PATH"
     log_debug "Output set: buildkit-path=$(pwd)/$BUILDKIT_PATH"
 else
     log_debug "buildkit.toml generation disabled (INPUT_GENERATE_BUILDKIT=false)"
@@ -307,8 +345,8 @@ fi
 
 # Set outputs
 log_debug "Setting GitHub Action outputs..."
-echo "certificate-path=$SYSTEM_CERT_PATH" >> $GITHUB_OUTPUT
-echo "certificate-name=$CERT_NAME" >> $GITHUB_OUTPUT
+write_output "certificate-path" "$SYSTEM_CERT_PATH"
+write_output "certificate-name" "$CERT_NAME"
 log_debug "Outputs set: certificate-path=$SYSTEM_CERT_PATH, certificate-name=$CERT_NAME"
 
 # Cleanup
