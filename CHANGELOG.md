@@ -1,3 +1,7 @@
+## [3.0.5](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/compare/v3.0.4...v3.0.5) (2026-09-04)
+
+
+
 ## [3.0.4](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/compare/v3.0.3...v3.0.4) (2026-09-04)
 
 
