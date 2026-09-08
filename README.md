@@ -1,4 +1,4 @@
-# CA Certificate Import GitHub Action
+# CA Certificate Import
 
 [![CI](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/actions/workflows/ci.yml/badge.svg)](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -22,7 +22,7 @@ The action **auto-detects** the certificate source type (file path, URL, or inli
 
 ```yaml
 - name: Install custom certificate
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/company-ca.crt'
 ```
@@ -31,7 +31,7 @@ The action **auto-detects** the certificate source type (file path, URL, or inli
 
 ```yaml
 - name: Install certificate from URL
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'https://pki.company.com/ca.crt'
 ```
@@ -40,7 +40,7 @@ The action **auto-detects** the certificate source type (file path, URL, or inli
 
 ```yaml
 - name: Install certificate from secret
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: ${{ secrets.CUSTOM_CA_CERT }}
     certificate-name: 'company-ca.crt'
@@ -51,7 +51,7 @@ The action **auto-detects** the certificate source type (file path, URL, or inli
 ```yaml
 - name: Install certificate and generate buildkit.toml
   id: install-cert
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/company-ca.crt'
     generate-buildkit: 'true'
@@ -144,7 +144,7 @@ This action follows [Semantic Versioning](https://semver.org/).
 
 **Recommended usage:**
 ```yaml
-uses: LiquidLogicLabs/git-action-ca-certificate-import@v2  # Gets latest v2.x.x
+uses: LiquidLogicLabs/git-action-ca-certificate-import@v3  # Gets latest v3.x.x
 ```
 
 **Version pinning options:**
