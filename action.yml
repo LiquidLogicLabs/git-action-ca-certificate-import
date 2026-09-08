@@ -1,4 +1,4 @@
-name: 'Git CA Certificate Import'
+name: 'CA Certificate Import'
 description: 'Install custom SSL/TLS certificates for build environments'
 author: 'LiquidLogicLabs'
 
