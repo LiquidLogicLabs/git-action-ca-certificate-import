@@ -399,21 +399,22 @@ git commit -m "chore: update dependencies"
 
 ### Versioning Strategy
 
-- **Patch** (1.0.0 → 1.0.1): Bug fixes, no breaking changes
-- **Minor** (1.0.0 → 1.1.0): New features, no breaking changes
-- **Major** (1.0.0 → 2.0.0): Breaking changes
+- **Patch** (3.0.0 → 3.0.1): Bug fixes, no breaking changes
+- **Minor** (3.0.0 → 3.1.0): New features, no breaking changes
+- **Major** (3.0.0 → 4.0.0): Breaking changes
 
-Users on `@v1` get patches and minor updates automatically.
-Users on `@v1.0.0` never get updates (pinned).
+Users on `@v3` get patches and minor updates automatically.
+Users on `@v3.0.0` never get updates (pinned).
 
 ### Version Pinning
 
 Users can pin to different version levels:
 
-- `@v1` - Latest v1.x.x (major version) - gets updates automatically
-- `@v1.1` - Latest v1.1.x (minor version) - gets patch updates
-- `@latest` - Latest stable release
-- `@v1.1.3` - Exact version - never gets updates
+- `@v3` - Latest v3.x.x (major version) - gets updates automatically
+- `@v3.0` - Latest v3.0.x (minor version) - gets patch updates
+- `@v3.0.7` - Exact version - never gets updates
+
+There is no `@latest` tag; `@v3` is how you track the current major.
 
 ## Repository Settings
 

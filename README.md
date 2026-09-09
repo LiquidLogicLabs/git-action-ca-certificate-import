@@ -171,7 +171,7 @@ There is no `@latest` tag; use `@v3` to track the current major.
 
 - ✅ Use GitHub Secrets for sensitive certificate content
 - ✅ Verify certificate fingerprints before installation
-- ✅ Use specific version tags (`@v1.1.3`) in production workflows
+- ✅ Use specific version tags (`@v3.0.7`) in production workflows
 - ✅ Regularly update to the latest stable version for security patches
 - ⚠️ Avoid committing certificates directly to repositories
 - ⚠️ Use organization-approved certificate sources only
