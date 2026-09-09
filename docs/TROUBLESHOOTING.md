@@ -28,7 +28,7 @@ This guide helps resolve common issues when using the CA Certificate Import Acti
   uses: actions/checkout@v6  # Must run before using file paths
 
 - name: Install certificate
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/ca.crt'  # Relative to repo root
 ```
@@ -62,7 +62,7 @@ This guide helps resolve common issues when using the CA Certificate Import Acti
     curl -k -o /tmp/ca.crt https://internal.server/ca.crt
 
 - name: Install certificate
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: '/tmp/ca.crt'
 ```
@@ -148,13 +148,13 @@ SSL certificate problem: unable to get local issuer certificate
 ```yaml
 # Install complete chain
 - name: Install root CA
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/root-ca.crt'
     certificate-name: 'root-ca.crt'
 
 - name: Install intermediate CA
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/intermediate-ca.crt'
     certificate-name: 'intermediate-ca.crt'
@@ -184,7 +184,7 @@ Error response from daemon: Get https://registry.example.com/v2/: x509: certific
 ```yaml
 # Correct order - certificate FIRST
 - name: Install certificate FIRST
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/ca.crt'
     verbose: true
@@ -225,7 +225,7 @@ Error response from daemon: Get https://registry.example.com/v2/: x509: certific
 ```yaml
 # Correct inline usage (auto-detected)
 - name: Install from secret
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: ${{ secrets.CA_CERTIFICATE }}  # Auto-detected as inline content
     certificate-name: 'custom-ca.crt'
@@ -252,7 +252,7 @@ Error response from daemon: Get https://registry.example.com/v2/: x509: certific
 
 ```yaml
 - name: Install certificate with verbose output
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v1
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/ca.crt'
     verbose: true  # Enables verbose output

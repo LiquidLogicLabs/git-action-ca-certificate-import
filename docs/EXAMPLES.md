@@ -8,7 +8,7 @@ This document provides comprehensive examples of using the CA Certificate Import
 
 ```yaml
 - name: Install company CA certificate
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/company-ca.crt'
 ```
@@ -17,7 +17,7 @@ This document provides comprehensive examples of using the CA Certificate Import
 
 ```yaml
 - name: Install certificate from PKI server
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'https://pki.company.com/certs/root-ca.crt'
     certificate-name: 'company-root-ca.crt'
@@ -27,7 +27,7 @@ This document provides comprehensive examples of using the CA Certificate Import
 
 ```yaml
 - name: Install certificate from secret
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: ${{ secrets.CUSTOM_CA_CERT }}
     certificate-name: 'custom-ca.crt'
@@ -39,13 +39,13 @@ This document provides comprehensive examples of using the CA Certificate Import
 
 ```yaml
 - name: Install root CA
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/root-ca.crt'
     certificate-name: 'root-ca.crt'
 
 - name: Install intermediate CA
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/intermediate-ca.crt'
     certificate-name: 'intermediate-ca.crt'
@@ -55,7 +55,7 @@ This document provides comprehensive examples of using the CA Certificate Import
 
 ```yaml
 - name: Install certificate with verboseging
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/verbose-ca.crt'
     verbose: true
@@ -66,7 +66,7 @@ This document provides comprehensive examples of using the CA Certificate Import
 ```yaml
 - name: Install certificate and generate buildkit.toml
   id: install-cert
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/company-ca.crt'
     certificate-name: 'company-ca.crt'
@@ -79,7 +79,7 @@ This document provides comprehensive examples of using the CA Certificate Import
 ```yaml
 - name: Install certificate and generate buildkit.toml with custom runtime
   id: install-cert
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/company-ca.crt'
     certificate-name: 'company-ca.crt'
@@ -119,7 +119,7 @@ jobs:
         uses: actions/checkout@v6
       
       - name: Install custom CA certificate
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: ${{ secrets.COMPANY_CA_CERT }}
           certificate-name: 'company-ca.crt'
@@ -160,7 +160,7 @@ jobs:
         uses: actions/checkout@v6
       
       - name: Install certificate from URL
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: 'https://pki.internal.net/ca/root.crt'
           verbose: true
@@ -206,7 +206,7 @@ jobs:
         uses: actions/checkout@v6
       
       - name: Install custom CA for internal PyPI
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: ${{ secrets.PYPI_CA_CERT }}
           certificate-name: 'internal-pypi-ca.crt'
@@ -242,7 +242,7 @@ jobs:
         uses: actions/checkout@v6
       
       - name: Install custom CA for internal npm
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: 'https://pki.company.com/npm-ca.crt'
       
@@ -276,7 +276,7 @@ jobs:
         uses: actions/checkout@v6
       
       - name: Install custom CA certificate
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: 'certs/internal-ca.crt'
       
@@ -299,7 +299,7 @@ jobs:
 
 ```yaml
 - name: Install certificate
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   id: install-cert
   with:
     certificate: 'certs/ca.crt'
@@ -323,7 +323,7 @@ jobs:
 
 ```yaml
 - name: Install certificate
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: ${{ secrets.REGISTRY_CA }}
     certificate-name: 'registry-ca.crt'
@@ -359,7 +359,7 @@ jobs:
 ```yaml
 - name: Install custom certificate
   if: ${{ env.CUSTOM_CERTIFICATE }}
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: '/certs/${{ env.CUSTOM_CERTIFICATE }}'
 ```
@@ -369,7 +369,7 @@ jobs:
 ```yaml
 - name: Install certificate (production only)
   if: github.ref == 'refs/heads/main'
-  uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+  uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: ${{ secrets.PROD_CA_CERT }}
     certificate-name: 'prod-ca.crt'
@@ -386,7 +386,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Install certificate from environment URL
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: ${{ env.CERT_URL }}
 ```
@@ -411,7 +411,7 @@ jobs:
       
       # Install corporate CA certificate
       - name: Install corporate CA
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: ${{ secrets.CORPORATE_CA_CERT }}
           certificate-name: 'corporate-ca.crt'
@@ -461,7 +461,7 @@ jobs:
       
       - name: Install certificate and generate buildkit.toml
         id: cert-install
-        uses: LiquidLogicLabs/git-action-ca-certificate-import@v2
+        uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: ${{ secrets.COMPANY_CA_CERT }}
           certificate-name: 'company-ca.crt'
