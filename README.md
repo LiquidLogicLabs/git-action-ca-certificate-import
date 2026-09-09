@@ -148,10 +148,12 @@ uses: LiquidLogicLabs/git-action-ca-certificate-import@v3  # Gets latest v3.x.x
 ```
 
 **Version pinning options:**
-- `@v2` - Latest v2.x.x (major version) - **Recommended** (includes auto-detection)
-- `@v1` - Latest v1.x.x (legacy - requires certificate-source and certificate-body)
-- `@latest` - Latest stable release
-- `@v2.0.0` - Exact version
+- `@v3` - Latest v3.x.x (major version) - **Recommended**
+- `@v3.0` - Latest v3.0.x (minor version)
+- `@v3.0.7` - Exact version
+- `@v2`, `@v1` - Earlier majors, kept working but no longer receiving fixes; see the breaking-change notice below
+
+There is no `@latest` tag; use `@v3` to track the current major.
 
 **Breaking Change Notice**: Version v2.0.0 introduces auto-detection. The `certificate-source` and `certificate-body` inputs have been replaced with a single `certificate` input that auto-detects the source type.
 
