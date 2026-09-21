@@ -1,0 +1,97 @@
+# E2E: run the action the way a consumer does (uses: ./) and assert its real effect --
+# that the system trust store actually trusts the imported CA afterwards. This action had
+# no E2E at all, so nothing verified the import beyond the script exiting 0.
+name: E2E tests
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Distinct 'e2e-' prefix: release.yml calls this workflow and groups on
+  # ${{ github.workflow }}-<ref>, which resolves to the SAME value here when called.
+  # CLAUDE.md records a shared group between caller and callee as a deadlock.
+  group: e2e-${{ github.workflow || 'E2E Tests' }}-${{ github.ref || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: E2E (action as used)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # No step in this job pushes; the credential is not needed.
+          persist-credentials: false
+
+      - name: Generate a throwaway CA and a leaf signed by it
+        id: gen
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/e2e-ca
+          cd /tmp/e2e-ca
+          openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 2 \
+            -keyout ca.key -out ca.crt \
+            -subj "/CN=LiquidLogicLabs E2E Throwaway CA" \
+            -addext "basicConstraints=critical,CA:TRUE" 2>/dev/null
+          openssl req -newkey rsa:2048 -nodes -sha256 \
+            -keyout leaf.key -out leaf.csr -subj "/CN=e2e.invalid" 2>/dev/null
+          openssl x509 -req -in leaf.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+            -days 2 -sha256 -out leaf.crt 2>/dev/null
+          # Random delimiter: a fixed one could appear in the value, which is how a
+          # multiline output turns into an injection.
+          delim="PEM_$(openssl rand -hex 12)"
+          {
+            echo "pem<<${delim}"
+            cat ca.crt
+            echo "${delim}"
+          } >> "$GITHUB_OUTPUT"
+          echo "fingerprint=$(openssl x509 -in ca.crt -noout -fingerprint -sha256 | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Baseline - the system store must NOT trust the leaf yet
+        run: |
+          set -euo pipefail
+          if openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt /tmp/e2e-ca/leaf.crt >/dev/null 2>&1; then
+            echo "::error::the system store already trusts the throwaway leaf; the test would prove nothing"
+            exit 1
+          fi
+          echo "baseline correct: leaf is untrusted before the import"
+
+      - name: Import the CA
+        id: import
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
+        with:
+          certificate: ${{ steps.gen.outputs.pem }}
+          certificate-name: 'e2e-throwaway-ca.crt'
+          verbose: 'true'
+
+      - name: Outputs are populated and the file landed in the CA directory
+        env:
+          Z_PATH: ${{ steps.import.outputs.certificate-path }}
+          Z_NAME: ${{ steps.import.outputs.certificate-name }}
+        run: |
+          set -euo pipefail
+          [ -n "${Z_PATH}" ] || { echo "::error::certificate-path output is empty"; exit 1; }
+          [ "${Z_NAME}" = "e2e-throwaway-ca.crt" ] || { echo "::error::certificate-name is '${Z_NAME}'"; exit 1; }
+          [ -f /usr/local/share/ca-certificates/e2e-throwaway-ca.crt ] \
+            || { echo "::error::certificate was not written under /usr/local/share/ca-certificates"; exit 1; }
+          echo "path=${Z_PATH} name=${Z_NAME}"
+
+      - name: The imported certificate matches what we generated
+        run: |
+          set -euo pipefail
+          installed="$(openssl x509 -in /usr/local/share/ca-certificates/e2e-throwaway-ca.crt -noout -fingerprint -sha256 | cut -d= -f2)"
+          expected="$(openssl x509 -in /tmp/e2e-ca/ca.crt -noout -fingerprint -sha256 | cut -d= -f2)"
+          [ "$installed" = "$expected" ] || { echo "::error::installed fingerprint $installed != $expected"; exit 1; }
+          echo "fingerprint matches: $installed"
+
+      - name: The system store now trusts the leaf
+        # The behaviour that actually matters: update-ca-certificates ran and took effect.
+        run: |
+          set -euo pipefail
+          openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt /tmp/e2e-ca/leaf.crt \
+            || { echo "::error::system store does not trust a cert signed by the imported CA"; exit 1; }
+          echo "trust store verified: the imported CA is effective"
