@@ -53,3 +53,4 @@ yarn-error.log*
 .devcontainer-secrets
 .secrets.*
 .actrc.local
+_bmad-output/
