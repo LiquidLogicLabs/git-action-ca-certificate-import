@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["ruamel.yaml>=0.18"]
 # ///
-# pm-status-version: 3.4.0   (machine-readable marker; `self-install` compares this across copies — keep at top)
+# pm-status-version: 3.4.2   (machine-readable marker; `self-install` compares this across copies — keep at top)
 """
 pm-status.py — deterministic, atomic, round-trip-safe writer for the l3io-pm
 sharded state tree, and the reader behind its progress report.
@@ -333,7 +333,7 @@ except ModuleNotFoundError:  # pragma: no cover - environment guard
     )
     sys.exit(2)
 
-PM_STATUS_VERSION = "3.4.0"  # keep in sync with the top-of-file `# pm-status-version:` marker
+PM_STATUS_VERSION = "3.4.2"  # keep in sync with the top-of-file `# pm-status-version:` marker
 
 VALID_STORY_STATUS = {"backlog", "ready-for-dev", "in-progress", "review", "done", "blocked"}
 VALID_SPRINT_STATUS = {"backlog", "in-progress", "review", "done"}
@@ -6076,8 +6076,48 @@ def cmd_set_field(args) -> int:
                    f"{DERIVED_NODE_FIELDS[contained]}")
 
     kind = _infer_kind(args)
+    _check_lane_value(args, kind)
     with _epic_write_lock(args, kind):
         return _set_field(args, kind)
+
+
+# A lane is a NUMBER, 1..999. Not a style choice -- it is what makes "never a person"
+# mechanical instead of hopeful. A word-shaped token cannot be screened: `sarah` and
+# `backend` are the same shape, so any regex permitting the second permits the first, and a
+# list of names to reject would be both brittle and culturally parochial. Numbering closes
+# the question by construction, and it matches the rest of the design: `lane_count` is a
+# count, and a lane is a slot in `1..lane_count`.
+_LANE_RE = re.compile(r"^[1-9][0-9]{0,2}$")
+
+
+def _check_lane_value(args, kind) -> None:
+    """Guard the `lane` field: epic-only, and never a person's name.
+
+    WHY THE FIELD IS `lane` AND NOT `owner`. `owner` attracts names — somebody commits
+    `owner: sarah` and the generic concept erodes by default rather than by decision. A lane
+    is a slot in a partition; who fills it lives in the gitignored user layer, so a human's
+    name cannot reach the repository at all. The vocabulary is the guardrail, and this
+    function is what stops the vocabulary being the ONLY guardrail.
+
+    EPIC-ONLY, because `1 epic = 1 lane` is the invariant everything else rests on: sprints
+    and stories live under their epic's directory and inherit its lane by construction. A
+    story carrying its own lane would make the lane graph a different graph from the epic
+    graph, and every cross-lane question would need its own traversal instead of relabelling
+    the epic one.
+    """
+    if getattr(args, "field", None) != "lane":
+        return
+    if kind != "epic":
+        _die_usage(f"`lane` lives on an epic node, not a {kind}. Sprints and stories inherit "
+                   f"their epic's lane from the directory they are in — one epic is one lane, "
+                   f"and a story with its own lane would break that")
+    value = str(getattr(args, "value", "") or "")
+    if not _LANE_RE.match(value):
+        _die_usage(f"lane {value!r} is not a lane number. A lane is a SLOT in a partition — "
+                   f"1, 2, 3 — never a person: who works a lane is recorded in the gitignored "
+                   f"user config, so a name cannot reach the repository. Numbering is what "
+                   f"makes that mechanical: a word-shaped token cannot be screened, because "
+                   f"`backend` and `sarah` are the same shape. Expected 1-999")
 
 
 def _set_field(args, kind) -> int:
@@ -8008,7 +8048,13 @@ def _rewrite_references(state_root: str, old_key: str, new_key: str) -> int:
         with issues_lock(open_path):
             store = IssueStore(open_path)
             hit = False
-            for lst in (store.backlog(), store.resolved()):
+            # PROPERTIES, not methods. `store.backlog()` raised
+            # `TypeError: 'CommentedSeq' object is not callable` and left the move
+            # half-applied -- the node had already been renamed and its key rewritten, so
+            # the tree kept a story at its new key with every reference still naming the
+            # old one. Every other call site in this file reads them correctly; this was
+            # the only one, and no test reached it because none created an issues.yaml.
+            for lst in (store.backlog, store.resolved):
                 for item in lst:
                     if isinstance(item, dict) and item.get("ref") == old_key:
                         item["ref"] = new_key
@@ -8263,6 +8309,10 @@ def dump_plan(state_root: str) -> dict:
             "key": epic_key,
             "status": str(enode.get("status") or ""),
             "depends_on": [str(v) for v in (enode.get("depends_on") or [])],
+            # Absent when lanes are not in use, which is the normal single-developer state.
+            # Consumers cannot read state directly (check 26), so this is the only way the
+            # partition reaches plan-graph.py.
+            "lane": str(enode["lane"]) if enode.get("lane") is not None else None,
             "estimate": _plain(enode.get("estimate")),
             "sprints": [],
         }

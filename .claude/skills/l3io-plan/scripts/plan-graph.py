@@ -183,6 +183,69 @@ def phases(plan: dict) -> dict:
             "epic_count": sum(len(p["epics"]) for p in out)}
 
 
+def partition(plan: dict, lane_count: int) -> dict:
+    """Propose which lane owns which epic. Emits a proposal; assigns nothing.
+
+    WHEN THIS IS ASKED FOR. `lane_count > 1` — a CONFIGURED answer from setup, never inferred
+    from the tree. A project set up for three lanes that has not assigned any yet looks
+    exactly like a single-developer project if you only scan epics, and they must not get the
+    same answer.
+
+    TWO OBJECTIVES, REPORTED SEPARATELY, because they are not the same thing. Minimising
+    cross-lane edges keeps lanes independent; keeping every lane busy is about phase coverage.
+    A partition that is perfect by connectivity can hand one lane only late-phase epics and
+    leave it idle until another finishes, so both numbers are reported and neither is silently
+    traded for the other.
+
+    OVER-PARTITIONING HAS A PRICE, AND SAYING SO IS THE POINT. Asking for more lanes than the
+    work supports forces splits through real dependencies. On an eight-epic fixture with two
+    natural clusters, k=2 costs zero cross-lane edges and k=3 costs two. A lead deciding
+    whether to put a third person on this needs that before assigning, not after.
+    """
+    import networkx as nx
+    from networkx.algorithms import community as nxc
+
+    epics = {e["key"]: e for e in plan.get("planned", [])}
+    if not epics:
+        return {"lanes": [], "note": "no planned epics to partition"}
+    k = max(1, min(int(lane_count), len(epics)))
+
+    edges = {k2: [d for d in (v.get("depends_on") or []) if d in epics]
+             for k2, v in epics.items()}
+    g = _digraph(edges)
+    # UNDIRECTED for the split: an edge that crosses a lane boundary costs the same whichever
+    # way it points -- one lane waits on the other either way.
+    groups = ([set(epics)] if k == 1
+              else [set(c) for c in nxc.greedy_modularity_communities(
+                  g.to_undirected(), best_n=k, cutoff=k)])
+
+    lane_of = {e: i + 1 for i, grp in enumerate(groups) for e in grp}
+    crossing = [(u, v) for u, v in g.edges if lane_of[u] != lane_of[v]]
+
+    gens = ([] if not nx.is_directed_acyclic_graph(g)
+            else [set(x) for x in nx.topological_generations(g)])
+    lanes = []
+    for i, grp in enumerate(sorted(groups, key=lambda s: sorted(s)), start=1):
+        idx = lane_of[next(iter(grp))]
+        phases = [n for n, gen in enumerate(gens, 1) if gen & grp]
+        lanes.append({
+            "lane": idx,
+            "epics": sorted(grp),
+            "phases": phases,
+            "idle_phases": [n for n in range(1, len(gens) + 1) if n not in phases],
+        })
+    out = {
+        "lanes": sorted(lanes, key=lambda x: x["lane"]),
+        "lane_count": k,
+        "cross_lane_edges": len(crossing),
+        "crossings": [{"from": u, "to": v} for u, v in sorted(crossing)],
+    }
+    if k < int(lane_count):
+        out["note"] = (f"only {len(epics)} planned epic(s), so {lane_count} lanes cannot each "
+                       f"own one; proposing {k}")
+    return out
+
+
 def analyze(plan: dict) -> dict:
     stories, epics, story_epic = index(plan)
     active = {e["key"] for e in plan.get("active", [])}
@@ -275,6 +338,33 @@ def analyze(plan: dict) -> dict:
                 f"can be scheduled into the same parallel phase and run concurrently. Add "
                 f"{b} to {a}'s depends_on.")
 
+    # --- dependencies that cross a LANE boundary -----------------------------------
+    #
+    # THE WHOLE LANE FEATURE RIDES ON ONE RELABEL. `coupling` above is already keyed by epic
+    # pair, and `1 epic = 1 lane` makes the lane graph the epic graph with relabelled nodes
+    # -- a colouring, not a second graph -- so this needs no traversal of its own. Had a
+    # story been lane-assignable independently of its epic, the two graphs would differ and
+    # every question here would need its own walk.
+    #
+    # SILENT WHEN LANES ARE OFF, which is the majority of projects. An epic with no `lane`
+    # contributes nothing, so a tree that never declared one produces no findings at all.
+    #
+    # WARN, unlike unneeded-epic-dependency: a reorg CAN act on this, by moving the story to
+    # an epic the other lane owns. That is the one remedy, and it is a reorg rather than a
+    # field change, because moving between lanes means moving between epics.
+    lane_of = {e["key"]: e.get("lane") for e in plan.get("planned", [])}
+    lane_cross = {}
+    for (a, b), n in coupling.items():
+        la, lb = lane_of.get(a), lane_of.get(b)
+        if la and lb and str(la) != str(lb):
+            lane_cross[(str(la), str(lb))] = lane_cross.get((str(la), str(lb)), 0) + n
+    for (la, lb), n in sorted(lane_cross.items(), key=lambda kv: (-kv[1], kv[0])):
+        add("cross-lane-dependency", "warn", [f"lane {la}", f"lane {lb}"], {"edges": n},
+            f"{n} story dependency(ies) cross from lane {la} into lane {lb}. Lane {la} waits "
+            f"on lane {lb} for those, so the two developers are not working independently. "
+            f"Move the story to an epic lane {lb} owns (/l3io-plan reorg), or accept the "
+            f"coupling deliberately.")
+
     # --- an epic dependency nothing justifies any more ----------------------------
     #
     # THE INVERSE of unbacked-cross-epic-dependency above, and the signal a reorg produces.
@@ -354,8 +444,11 @@ def analyze(plan: dict) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="plan-graph.py", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", choices=("analyze", "phases"),
-                    help="analyze: measured findings. phases: the execution order.")
+    ap.add_argument("mode", choices=("analyze", "phases", "partition"),
+                    help="analyze: measured findings. phases: the execution order. "
+                         "partition: propose which lane owns which epic.")
+    ap.add_argument("--lanes", type=int, default=0,
+                    help="partition mode: how many lanes (from modules.l3io-pm.lane_count)")
     ap.add_argument("--pretty", action="store_true",
                     help="indent the JSON for reading by hand")
     a = ap.parse_args(sys.argv[1:] if argv is None else argv)
@@ -371,7 +464,14 @@ def main(argv=None) -> int:
                          "`planned` key); refusing to read an unknown shape.\n")
         return 2
 
-    result = analyze(plan) if a.mode == "analyze" else phases(plan)
+    if a.mode == "partition":
+        if a.lanes < 2:
+            sys.stderr.write("plan-graph.py: partition needs --lanes 2 or more; "
+                             "lane_count of 1 or absent means lanes are off.\n")
+            return 2
+        result = partition(plan, a.lanes)
+    else:
+        result = analyze(plan) if a.mode == "analyze" else phases(plan)
     sep = None if a.pretty else (",", ":")
     sys.stdout.write(json.dumps(result, indent=2 if a.pretty else None,
                                 separators=sep) + "\n")
