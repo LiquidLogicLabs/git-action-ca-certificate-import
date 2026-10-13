@@ -162,43 +162,58 @@ SSL certificate problem: unable to get local issuer certificate
 
 ---
 
-### 6. Docker Still Can't Pull Images
+### 6. Docker or BuildKit Still Gets x509 From a Registry
 
-**Error Message:**
+**Error Messages:**
 ```
+ERROR: failed to push registry.example.com/app:1: ... tls: failed to verify certificate: x509: certificate signed by unknown authority
 Error response from daemon: Get https://registry.example.com/v2/: x509: certificate signed by unknown authority
 ```
 
-**Causes:**
-- Certificate not properly installed in system store
-- Certificate installed after BuildKit started
-- Wrong certificate installed
+Neither BuildKit nor a running Docker daemon reads the system store that this action updates, so step order alone does not fix this. Which fix applies depends on what reported the error.
 
-**Solutions:**
-- Install certificate BEFORE setting up BuildKit
-- Verify certificate is for correct domain/CA
-- Check certificate is in `/usr/local/share/ca-certificates/`
-- Ensure `update-ca-certificates` ran successfully
+**A. BuildKit** (`docker buildx build`, `docker/build-push-action`, a `FROM` in a Dockerfile; the error mentions `failed to push`, `failed to solve` or `failed to do request`)
 
-**Example Fix:**
+The buildx builder runs BuildKit in its own container, with its own trust store. Give it the CA through a generated BuildKit config:
+
 ```yaml
-# Correct order - certificate FIRST
-- name: Install certificate FIRST
+- name: Install certificate and generate buildkit.toml
+  id: install-cert
   uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
     certificate: 'certs/ca.crt'
-    verbose: true
+    generate-buildkit: 'true'
+    buildkit-registries: 'registry.example.com'
 
-- name: Set up Docker Buildx AFTER certificate
+- name: Set up Docker Buildx
   uses: docker/setup-buildx-action@v3
-
-- name: Login to registry
-  uses: docker/login-action@v3
   with:
-    registry: registry.example.com
-    username: ${{ secrets.REGISTRY_USER }}
-    password: ${{ secrets.REGISTRY_PASS }}
+    buildkitd-config: ${{ steps.install-cert.outputs.buildkit-path }}
 ```
+
+If it still fails, check:
+- `buildkit-registries` names the registry **exactly** as it appears in the image reference, port included (`registry.example.com:5000` and `registry.example.com` are different hosts). There is no wildcard.
+- The step log has no `buildkit-registries not set` warning. Without hosts, the generated file uses keys BuildKit ignores.
+- The builder was created from this config. `buildkitd-config` only applies when setup-buildx creates the builder. A builder created earlier in the job, or the `docker` driver, does not use it.
+
+**B. The Docker daemon** (`docker pull`, `docker push`, `docker login`; the error starts `Error response from daemon`)
+
+`dockerd` loads the system CA store once, when it starts. On a hosted runner it is already running, so a CA this action installs is not seen until the daemon restarts. Either give Docker the CA per registry, which it reads on each connection with no restart:
+
+```yaml
+- name: Trust the CA for the Docker daemon
+  env:
+    CERT_PATH: ${{ steps.install-cert.outputs.certificate-path }}
+  run: |
+    sudo mkdir -p /etc/docker/certs.d/registry.example.com
+    sudo cp "$CERT_PATH" /etc/docker/certs.d/registry.example.com/ca.crt
+```
+
+(use `registry.example.com:5000` as the directory name if the registry has a port), or restart the daemon after the import with `sudo systemctl restart docker`.
+
+**Also check**, for either case:
+- The certificate is the CA that signed the registry's certificate (or its chain), not the registry's own leaf.
+- `update-ca-certificates` ran successfully: `verbose: true` shows it.
 
 ---
 
