@@ -1,3 +1,20 @@
+# [3.1.0](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/compare/v3.0.7...v3.1.0) (2026-10-13)
+
+
+### Bug Fixes
+
+* **release-notes:** categorise revert commits under Maintenance ([9a9744b](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/commit/9a9744b33e08ebe43fe8fa1b96f73bd7b51ddd03))
+* **release-notes:** categorise the changelog by conventional-commit type ([4b4ecad](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/commit/4b4ecad3178cd07747c5a7460cc72a93d73c73cb))
+* **release-notes:** drop the dead PR_LIST placeholder ([0779f0e](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/commit/0779f0e6c9f2073746c997ccb93d14381e853b53))
+
+
+### Features
+
+* **bmad:** add the cis module (v0.3.2) ([9010d1c](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/commit/9010d1c1d45193a89081492476258a7e3be2e56d))
+* **buildkit:** generate per-registry CA tables via buildkit-registries ([e46db37](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/commit/e46db37f89a921e57def83416737dbde9a018e56))
+
+
+
 ## [3.0.6](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/compare/v3.0.5...v3.0.6) (2026-09-08)
 
 
