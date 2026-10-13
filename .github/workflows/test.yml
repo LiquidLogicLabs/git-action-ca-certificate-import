@@ -201,6 +201,142 @@ jobs:
           echo "  certificate-name: $CERT_NAME"
           echo "  buildkit-path: $BUILDKIT_PATH"
       
+      # Test 3b: buildkit-registries. The generated file is read back with a real TOML
+      # parser (tomllib, Python >= 3.11; ubuntu-22.04 ships 3.10) rather than grepped, so
+      # the assertion is on the structure BuildKit will decode. The e2e workflow proves
+      # BuildKit actually honours it.
+      - name: Set up Python for TOML assertions
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Test - BuildKit registries (one host)
+        id: buildkit-one-host
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
+        with:
+          certificate: 'test-certs/test-ca.crt'
+          certificate-name: 'buildkit-one-host.crt'
+          generate-buildkit: 'true'
+          buildkit-registries: 'git.example.com'
+
+      - name: Verify BuildKit registries (one host)
+        env:
+          Z_BUILDKIT_PATH: ${{ steps.buildkit-one-host.outputs.buildkit-path }}
+        run: |
+          python3 - "$Z_BUILDKIT_PATH" <<'PY'
+          import sys, tomllib
+          cfg = tomllib.load(open(sys.argv[1], 'rb'))
+          ca = '/usr/local/share/ca-certificates/buildkit-one-host.crt'
+          want = {'git.example.com': {'ca': [ca]}}
+          assert cfg.get('registry') == want, f"registry tables: {cfg.get('registry')!r}"
+          assert 'worker' not in cfg, f"unexpected worker section: {cfg['worker']!r}"
+          print('✓ one [registry."git.example.com"] table with the installed CA')
+          PY
+
+      - name: Test - BuildKit registries (several hosts, ports, mixed separators)
+        id: buildkit-many-hosts
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
+        with:
+          certificate: 'test-certs/test-ca.crt'
+          certificate-name: 'buildkit-many-hosts.crt'
+          generate-buildkit: 'true'
+          buildkit-runtime: 'io.containerd.runc.v2'
+          buildkit-registries: |
+            git.example.com, registry.example.com:5000
+            10.0.1.184:5443,,[fd00::1]:5000
+            git.example.com
+
+      - name: Verify BuildKit registries (several hosts, ports, mixed separators)
+        env:
+          Z_BUILDKIT_PATH: ${{ steps.buildkit-many-hosts.outputs.buildkit-path }}
+        run: |
+          python3 - "$Z_BUILDKIT_PATH" <<'PY'
+          import sys, tomllib
+          cfg = tomllib.load(open(sys.argv[1], 'rb'))
+          ca = ['/usr/local/share/ca-certificates/buildkit-many-hosts.crt']
+          hosts = ['git.example.com', 'registry.example.com:5000', '10.0.1.184:5443', '[fd00::1]:5000']
+          got = cfg.get('registry')
+          assert got == {h: {'ca': ca} for h in hosts}, f"registry tables: {got!r}"
+          # Order follows the input, and the duplicate is dropped.
+          assert list(got) == hosts, f"host order: {list(got)!r}"
+          assert 'containerd' in cfg.get('worker', {}), 'buildkit-runtime section was dropped'
+          print(f'✓ {len(hosts)} registry tables, one per distinct host, runtime kept')
+          PY
+
+      # Run directly: a non-zero exit is the PASS here (see the note on the rejection tests below).
+      - name: Test - rejects invalid buildkit-registries values
+        env:
+          INPUT_CERTIFICATE: test-certs/test-ca.crt
+          INPUT_VERBOSE: 'false'
+          INPUT_GENERATE_BUILDKIT: 'true'
+        run: |
+          check() {
+            want="$1"; value="$2"
+            name="reject-$(openssl rand -hex 4).crt"
+            rm -f buildkit.toml
+            set +e
+            out=$(INPUT_CERTIFICATE_NAME="$name" INPUT_BUILDKIT_REGISTRIES="$value" bash ./install-certificate.sh 2>&1); rc=$?
+            set -e
+            test "$rc" -ne 0 || { echo "$out"; echo "::error::accepted invalid buildkit-registries: $value"; exit 1; }
+            echo "$out" | grep -qF -- "$want" \
+              || { echo "$out"; echo "::error::'$value' rejected, but not with '$want'"; exit 1; }
+            test ! -e "/usr/local/share/ca-certificates/$name" \
+              || { echo "::error::'$value' was rejected only after the certificate was installed"; exit 1; }
+            test ! -e buildkit.toml || { echo "::error::'$value' still produced buildkit.toml"; exit 1; }
+            echo "✓ rejected: $value"
+          }
+          check 'no wildcard registry host' '*'
+          check 'no wildcard registry host' '*.example.com'
+          check 'without a scheme' 'https://git.example.com'
+          check 'not a valid host[:port]' 'git.example.com/v2'
+          check 'not a valid host[:port]' 'bad_host.example.com'
+          check 'not a valid host[:port]' 'git.example.com"] x = ["'
+          check 'not a valid host[:port]' 'git.example.com:'
+          check 'not a valid host[:port]' '-git.example.com'
+          check 'port outside 1-65535' 'git.example.com:0'
+          check 'port outside 1-65535' 'git.example.com:65536'
+          check 'not a valid host[:port]' $'good.example.com\nbad host'
+
+      - name: Test - no buildkit-registries keeps the legacy file and warns
+        env:
+          INPUT_CERTIFICATE: test-certs/test-ca.crt
+          INPUT_CERTIFICATE_NAME: 'buildkit-no-hosts.crt'
+          INPUT_VERBOSE: 'false'
+          INPUT_GENERATE_BUILDKIT: 'true'
+          INPUT_BUILDKIT_REGISTRIES: ''
+        run: |
+          rm -f buildkit.toml
+          out=$(bash ./install-certificate.sh 2>&1)
+          echo "$out"
+          echo "$out" | grep -q '^::warning title=buildkit-registries not set::' \
+            || { echo "::error::no warning annotation when buildkit-registries is empty"; exit 1; }
+          python3 - buildkit.toml <<'PY'
+          import sys, tomllib
+          cfg = tomllib.load(open(sys.argv[1], 'rb'))
+          assert 'registry' not in cfg, 'legacy file unexpectedly gained registry tables'
+          assert cfg['worker']['oci']['registry'][0]['tls']['ca'] == ['/usr/local/share/ca-certificates/buildkit-no-hosts.crt']
+          print('✓ legacy file unchanged for callers that set no hosts')
+          PY
+
+      - name: Test - rejects a certificate-name that would break the TOML string
+        env:
+          INPUT_CERTIFICATE: test-certs/test-ca.crt
+          INPUT_CERTIFICATE_NAME: 'quote"] x = ["y.crt'
+          INPUT_VERBOSE: 'false'
+          INPUT_GENERATE_BUILDKIT: 'true'
+          INPUT_BUILDKIT_REGISTRIES: 'git.example.com'
+        run: |
+          rm -f buildkit.toml
+          set +e
+          out=$(bash ./install-certificate.sh 2>&1); rc=$?
+          set -e
+          echo "$out"
+          test "$rc" -ne 0 || { echo "::error::TOML-breaking certificate-name was accepted"; exit 1; }
+          echo "$out" | grep -q 'may not contain a quote' \
+            || { echo "::error::rejected, but not by the certificate-name TOML guard"; exit 1; }
+          test ! -e buildkit.toml || { echo "::error::buildkit.toml was still written"; exit 1; }
+          echo "✓ TOML-breaking certificate-name refused"
+
       # Test 4: URL-based certificate source
       # Hoisting the expression out of the run: block produced a SECOND `env:` key on this
       # step, because the pre-existing one sat below `run:`. YAML takes the last and drops
