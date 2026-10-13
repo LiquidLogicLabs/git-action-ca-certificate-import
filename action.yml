@@ -29,6 +29,15 @@ inputs:
     description: 'Generate buildkit.toml configuration file with CA certificate settings'
     required: false
     default: 'false'
+
+  buildkit-registries:
+    description: |
+      Registry host(s) BuildKit must trust the CA for, used when generate-buildkit is true.
+      Newline- or comma-separated host[:port] values (e.g. 'registry.example.com:5000').
+      Each gets its own [registry."<host>"] table; BuildKit has no wildcard host.
+      If empty, the legacy file is generated with a warning: BuildKit ignores its keys and does not trust the CA.
+    required: false
+    default: ''
   
   buildkit-runtime:
     description: 'Container runtime for BuildKit (e.g., "io.containerd.runc.v2"). Leave empty to omit runtime configuration'
@@ -72,5 +81,6 @@ runs:
         INPUT_VERBOSE: ${{ inputs.verbose == 'true' || env.ACTIONS_STEP_DEBUG == 'true' }}
         INPUT_GENERATE_BUILDKIT: ${{ inputs.generate-buildkit }}
         INPUT_BUILDKIT_RUNTIME: ${{ inputs.buildkit-runtime }}
+        INPUT_BUILDKIT_REGISTRIES: ${{ inputs.buildkit-registries }}
         INPUT_SKIP_CERTIFICATE_CHECK: ${{ inputs.skip-certificate-check }}
 
