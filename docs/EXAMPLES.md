@@ -63,6 +63,8 @@ This document provides comprehensive examples of using the CA Certificate Import
 
 ### 6. Generate BuildKit Configuration
 
+BuildKit runs in its own container and does not use the runner's trust store. Name every registry host it must trust the CA for in `buildkit-registries`, and pass `buildkit-path` to `docker/setup-buildx-action`:
+
 ```yaml
 - name: Install certificate and generate buildkit.toml
   id: install-cert
@@ -71,8 +73,18 @@ This document provides comprehensive examples of using the CA Certificate Import
     certificate: 'certs/company-ca.crt'
     certificate-name: 'company-ca.crt'
     generate-buildkit: 'true'
+    buildkit-registries: |
+      registry.company.com
+      registry.company.com:5000
     verbose: true
+
+- name: Set up Docker Buildx
+  uses: docker/setup-buildx-action@v3
+  with:
+    buildkitd-config: ${{ steps.install-cert.outputs.buildkit-path }}
 ```
+
+Each host gets its own `[registry."<host>"]` table; BuildKit has no wildcard host, and the host must match the image reference exactly, port included. Without `buildkit-registries` the generated file is ignored by BuildKit (the action warns), and a push fails with `x509: certificate signed by unknown authority`.
 
 ### 7. Generate BuildKit Configuration with Custom Runtime
 
@@ -84,21 +96,17 @@ This document provides comprehensive examples of using the CA Certificate Import
     certificate: 'certs/company-ca.crt'
     certificate-name: 'company-ca.crt'
     generate-buildkit: 'true'
+    buildkit-registries: 'registry.company.com'
     buildkit-runtime: 'io.containerd.runc.v2'
     verbose: true
 
-- name: Setup Docker BuildKit with custom CA
-  run: |
-    echo "buildkit.toml generated at: ${{ steps.install-cert.outputs.buildkit-path }}"
-    
-    # Copy buildkit.toml to Docker BuildKit config directory
-    mkdir -p ~/.docker/buildx
-    cp "${{ steps.install-cert.outputs.buildkit-path }}" ~/.docker/buildx/config.toml
-    
-    # Verify the configuration
-    echo "BuildKit configuration:"
-    cat ~/.docker/buildx/config.toml
+- name: Set up Docker Buildx
+  uses: docker/setup-buildx-action@v3
+  with:
+    buildkitd-config: ${{ steps.install-cert.outputs.buildkit-path }}
 ```
+
+`buildkit-runtime` writes `[worker.containerd.runtime] name = "..."`, which only BuildKit's containerd worker reads. The `docker-container` builder that `setup-buildx-action` creates uses the OCI worker, so there the setting is accepted but has no effect.
 
 ## Complete Workflow Examples
 
@@ -119,13 +127,20 @@ jobs:
         uses: actions/checkout@v6
       
       - name: Install custom CA certificate
+        id: install-cert
         uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: ${{ secrets.COMPANY_CA_CERT }}
           certificate-name: 'company-ca.crt'
+          generate-buildkit: 'true'
+          buildkit-registries: 'registry.company.com'
       
+      # BuildKit does not use the runner's trust store; without buildkitd-config
+      # the push fails with "x509: certificate signed by unknown authority".
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config: ${{ steps.install-cert.outputs.buildkit-path }}
       
       - name: Login to registry
         uses: docker/login-action@v3
@@ -160,9 +175,12 @@ jobs:
         uses: actions/checkout@v6
       
       - name: Install certificate from URL
+        id: install-cert
         uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: 'https://pki.internal.net/ca/root.crt'
+          generate-buildkit: 'true'
+          buildkit-registries: 'harbor.internal.net'
           verbose: true
       
       - name: Set up QEMU
@@ -170,6 +188,8 @@ jobs:
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config: ${{ steps.install-cert.outputs.buildkit-path }}
       
       - name: Login to Harbor
         uses: docker/login-action@v3
@@ -261,6 +281,8 @@ jobs:
 
 ### 11. Docker Build with Internal Resources
 
+Installing the CA on the runner does **not** reach `RUN` steps: they execute inside the build's base image, with that image's trust store. Pass the CA into the build, for example as a build secret:
+
 ```yaml
 name: Docker Build with Internal Resources
 
@@ -276,22 +298,28 @@ jobs:
         uses: actions/checkout@v6
       
       - name: Install custom CA certificate
+        id: install-cert
         uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: 'certs/internal-ca.crt'
       
-      - name: Build image (can access internal resources in Dockerfile)
+      - name: Build image (Dockerfile reaches internal resources with the CA)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: false
           tags: myapp:test
-          # Dockerfile can now access:
-          # - Internal package repositories
-          # - Internal file servers
-          # - Internal APIs
-          # - etc.
+          secret-files: |
+            company-ca=${{ steps.install-cert.outputs.certificate-path }}
 ```
+
+```dockerfile
+# The secret is mounted only for this RUN step and is not stored in the image.
+RUN --mount=type=secret,id=company-ca,target=/tmp/company-ca.crt \
+    curl --cacert /tmp/company-ca.crt -fsSL https://files.corp.internal/tool.tar.gz -o /tmp/tool.tar.gz
+```
+
+If the base image is pulled from a registry signed by the same CA, also generate the BuildKit config as in [example 6](#6-generate-buildkit-configuration).
 
 ## Troubleshooting Examples
 
@@ -409,16 +437,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       
-      # Install corporate CA certificate
+      # Install corporate CA certificate; tools on the runner trust it from here on
       - name: Install corporate CA
+        id: install-cert
         uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
         with:
           certificate: ${{ secrets.CORPORATE_CA_CERT }}
           certificate-name: 'corporate-ca.crt'
+          generate-buildkit: 'true'
+          buildkit-registries: 'harbor.corp.internal'
       
-      # Now all internal services work automatically
+      # BuildKit has its own trust store: it gets the CA through buildkitd-config
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config: ${{ steps.install-cert.outputs.buildkit-path }}
       
       - name: Login to internal registry
         uses: docker/login-action@v3
@@ -435,12 +468,9 @@ jobs:
           tags: |
             harbor.corp.internal/myteam/myapp:${{ github.sha }}
             harbor.corp.internal/myteam/myapp:latest
-          # Dockerfile can now access:
-          # - harbor.corp.internal (registry)
-          # - pypi.corp.internal (Python packages)
-          # - npm.corp.internal (Node packages)
-          # - maven.corp.internal (Java packages)
-          # - Any other internal HTTPS service
+          # BuildKit trusts harbor.corp.internal (pull and push) via buildkitd-config.
+          # RUN steps that call pypi/npm/maven.corp.internal use the base image's
+          # trust store instead; pass the CA in as shown in example 11.
 ```
 
 ### 18. Advanced BuildKit Configuration with Custom CA
@@ -466,38 +496,33 @@ jobs:
           certificate: ${{ secrets.COMPANY_CA_CERT }}
           certificate-name: 'company-ca.crt'
           generate-buildkit: 'true'
+          # Every registry the build pulls from or pushes to through this CA
+          buildkit-registries: |
+            registry.company.com
+            mirror.company.com:5000
           verbose: true
       
-      - name: Setup Docker BuildKit with custom configuration
-        run: |
-          # Create BuildKit configuration directory
-          mkdir -p ~/.docker/buildx
-          
-          # Copy generated buildkit.toml to BuildKit config
-          cp "${{ steps.cert-install.outputs.buildkit-path }}" ~/.docker/buildx/config.toml
-          
-          # Display the configuration for verification
-          echo "BuildKit configuration applied:"
-          cat ~/.docker/buildx/config.toml
-          
-          # Create a new BuildKit builder instance
-          docker buildx create --name custom-builder --use
-          docker buildx inspect --bootstrap
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      # buildx create --config copies the CA named in buildkit.toml into the
+      # builder container and rewrites the path; nothing to copy by hand.
+      - name: Set up Docker Buildx with the generated config
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config: ${{ steps.cert-install.outputs.buildkit-path }}
       
       - name: Build with custom BuildKit configuration
         uses: docker/build-push-action@v6
         with:
           context: .
-          builder: custom-builder
+          builder: ${{ steps.buildx.outputs.name }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             registry.company.com/myapp:${{ github.sha }}
             registry.company.com/myapp:latest
-          # BuildKit will now use the custom CA certificate
-          # for all registry operations and internal resource access
-      
-      - name: Cleanup BuildKit builder
-        run: |
-          docker buildx rm custom-builder || true
+          # BuildKit trusts the CA for the registries listed above. RUN steps
+          # do not; see example 11 for passing the CA into the build.
 ```
