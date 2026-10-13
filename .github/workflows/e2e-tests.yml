@@ -95,3 +95,101 @@ jobs:
           openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt /tmp/e2e-ca/leaf.crt \
             || { echo "::error::system store does not trust a cert signed by the imported CA"; exit 1; }
           echo "trust store verified: the imported CA is effective"
+
+  buildkit-push:
+    # The buildkit.toml this action generates must make BuildKit trust the CA, proven by a
+    # real push. Fail-first is built in: the legacy file (no buildkit-registries) must FAIL
+    # with x509 against the same registry, so the passing push cannot be explained by
+    # something else trusting the CA. The registry runs on a user-defined network under a
+    # dotted alias, and the builder joins that network: no localhost special-casing, and
+    # the same addressing under act, where host paths and host IPs are not the job's.
+    name: E2E (BuildKit push to a private-CA registry)
+    runs-on: ubuntu-latest
+    env:
+      Z_REGISTRY: registry.e2e.test:5443
+      Z_NETWORK: ca-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # No step in this job pushes to git; the credential is not needed.
+          persist-credentials: false
+
+      - name: Generate a throwaway CA and a registry certificate signed by it
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/bk-ca && cd /tmp/bk-ca
+          openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 2 \
+            -keyout ca.key -out ca.crt -subj "/CN=LiquidLogicLabs BuildKit E2E Throwaway CA" \
+            -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" 2>/dev/null
+          openssl req -newkey rsa:2048 -nodes -sha256 -keyout leaf.key -out leaf.csr \
+            -subj "/CN=registry.e2e.test" 2>/dev/null
+          printf 'subjectAltName=DNS:registry.e2e.test\nextendedKeyUsage=serverAuth\n' > leaf.ext
+          openssl x509 -req -in leaf.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+            -days 2 -sha256 -extfile leaf.ext -out leaf.crt 2>/dev/null
+
+      - name: Start a TLS registry:2 on its own network
+        run: |
+          set -euo pipefail
+          docker network create "$Z_NETWORK"
+          # docker cp rather than -v: under act a bind path names the HOST, not this job.
+          docker create --name "$Z_NETWORK-registry" --network "$Z_NETWORK" --network-alias registry.e2e.test \
+            -e REGISTRY_HTTP_ADDR=0.0.0.0:5443 \
+            -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/leaf.crt -e REGISTRY_HTTP_TLS_KEY=/certs/leaf.key \
+            registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+          docker cp /tmp/bk-ca/. "$Z_NETWORK-registry:/certs"
+          docker start "$Z_NETWORK-registry"
+
+      - name: Import the CA with no buildkit-registries (legacy file)
+        id: legacy
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
+        with:
+          certificate: /tmp/bk-ca/ca.crt
+          certificate-name: 'bk-e2e-ca.crt'
+          generate-buildkit: 'true'
+
+      - name: Keep the legacy file (the next import overwrites buildkit.toml)
+        env:
+          Z_PATH: ${{ steps.legacy.outputs.buildkit-path }}
+        run: cp "$Z_PATH" /tmp/bk-ca/legacy.toml
+
+      - name: Import the CA with buildkit-registries
+        id: fixed
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
+        with:
+          certificate: /tmp/bk-ca/ca.crt
+          certificate-name: 'bk-e2e-ca.crt'
+          generate-buildkit: 'true'
+          buildkit-registries: ${{ env.Z_REGISTRY }}
+
+      - name: Push through a builder created with each file
+        env:
+          Z_FIXED: ${{ steps.fixed.outputs.buildkit-path }}
+        run: |
+          # No -e: the legacy push is EXPECTED to fail, and every outcome is checked explicitly.
+          set +e -uo pipefail
+          echo "--- generated with buildkit-registries:"; cat "$Z_FIXED"
+          mkdir -p /tmp/bk-ctx && echo "$GITHUB_RUN_ID" > /tmp/bk-ctx/marker
+          printf 'FROM scratch\nCOPY marker /marker\n' > /tmp/bk-ctx/Dockerfile
+          push() {
+            docker buildx create --name "$1" --driver docker-container \
+              --driver-opt "network=$Z_NETWORK" --config "$2" >/dev/null || return 90
+            docker buildx build --builder "$1" --push --progress plain \
+              -t "$Z_REGISTRY/ca-e2e:$1" /tmp/bk-ctx 2>&1
+          }
+          out=$(push "$Z_NETWORK-legacy" /tmp/bk-ca/legacy.toml); rc=$?
+          echo "$out" | tail -n 15
+          [ "$rc" -ne 0 ] || { echo "::error::the legacy file pushed: the test cannot tell a working config from a broken one"; exit 1; }
+          echo "$out" | grep -q 'certificate signed by unknown authority' \
+            || { echo "::error::legacy push failed (rc=$rc), but not with the x509 error this test is about"; exit 1; }
+          echo "✓ fail-first: the legacy file is ignored by BuildKit (x509)"
+          out=$(push "$Z_NETWORK-fixed" "$Z_FIXED"); rc=$?
+          echo "$out" | tail -n 15
+          [ "$rc" -eq 0 ] || { echo "::error::push with the buildkit-registries file failed (rc=$rc)"; exit 1; }
+          echo "✓ BuildKit trusted the CA via [registry.\"$Z_REGISTRY\"] and the push succeeded"
+
+      - name: Clean up
+        if: always()
+        run: |
+          for b in legacy fixed; do docker buildx rm "$Z_NETWORK-$b" >/dev/null 2>&1 || true; done
+          docker rm -f "$Z_NETWORK-registry" >/dev/null 2>&1 || true
+          docker network rm "$Z_NETWORK" >/dev/null 2>&1 || true
