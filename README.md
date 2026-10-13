@@ -9,7 +9,7 @@ A GitHub Action that installs custom SSL/TLS certificates into the CI/CD runner 
 
 - 📁 **Multiple Input Methods**: Local file, URL, or inline certificate content
 - 🔒 **System Integration**: Installs to system CA store and runs `update-ca-certificates`
-- 🐳 **BuildKit Support**: Optional generation of `buildkit.toml` configuration file
+- 🐳 **BuildKit Support**: Optional generation of a `buildkitd.toml` that makes BuildKit trust the CA for named registries
 - ✅ **Simple**: Just install the cert - Docker will automatically trust it
 - 🛡️ **Robust**: Comprehensive error handling and validation
 - 🔄 **Idempotent**: Safe to run multiple times
@@ -46,23 +46,43 @@ The action **auto-detects** the certificate source type (file path, URL, or inli
     certificate-name: 'company-ca.crt'
 ```
 
-### With BuildKit Configuration
+### With BuildKit (docker/setup-buildx-action)
+
+BuildKit runs in its own container and does not read the runner's trust store, so installing the CA is not enough for `docker buildx build --push`. Set `generate-buildkit` and name every registry host BuildKit must trust the CA for in `buildkit-registries`, then pass the `buildkit-path` output to `docker/setup-buildx-action`:
 
 ```yaml
-- name: Install certificate and generate buildkit.toml
+- name: Install certificate and generate buildkitd.toml
   id: install-cert
   uses: LiquidLogicLabs/git-action-ca-certificate-import@v3
   with:
-    certificate: 'certs/company-ca.crt'
+    certificate: ${{ secrets.CUSTOM_CA_CERT }}
+    certificate-name: 'company-ca.crt'
     generate-buildkit: 'true'
+    buildkit-registries: |
+      git.example.com
+      registry.example.com:5000
 
-- name: Use buildkit.toml for Docker builds
-  run: |
-    echo "buildkit.toml generated at: ${{ steps.install-cert.outputs.buildkit-path }}"
-    # Copy to Docker BuildKit config directory
-    mkdir -p ~/.docker/buildx
-    cp ${{ steps.install-cert.outputs.buildkit-path }} ~/.docker/buildx/config.toml
+- name: Set up Docker Buildx
+  uses: docker/setup-buildx-action@v4
+  with:
+    buildkitd-config: ${{ steps.install-cert.outputs.buildkit-path }}
 ```
+
+The generated file has one table per host:
+
+```toml
+[registry."git.example.com"]
+  ca = ["/usr/local/share/ca-certificates/company-ca.crt"]
+
+[registry."registry.example.com:5000"]
+  ca = ["/usr/local/share/ca-certificates/company-ca.crt"]
+```
+
+`ca` names the certificate on the runner. `buildx create --config`, which `buildkitd-config` runs, reads that file and copies it into the builder container (under `/etc/buildkit/certs/<host>/`), rewriting the path for you. This applies to the `docker-container` driver, which `setup-buildx-action` uses by default.
+
+Each `buildkit-registries` entry is a `host[:port]`, without a scheme or path. The host must match the registry part of the image reference exactly, including the port. BuildKit has no wildcard host, so `*` is rejected, and so is any value that is not a valid host name, IPv4 address or bracketed IPv6 address with an optional port 1-65535.
+
+> **Without `buildkit-registries`**, the action still writes the file it wrote in v3.0.7 and earlier, and emits a warning. BuildKit does not recognise that file's `[worker.oci.registry]` keys, so it does **not** trust the CA, and a push fails with `x509: certificate signed by unknown authority`.
 
 📚 **More examples:** See [docs/EXAMPLES.md](docs/EXAMPLES.md)
 
@@ -74,6 +94,7 @@ The action **auto-detects** the certificate source type (file path, URL, or inli
 | `certificate-name` | Name for certificate file | No | Auto-generated |
 | `verbose` | Enable verbose debug logging | No | `false` |
 | `generate-buildkit` | Generate buildkit.toml configuration file | No | `false` |
+| `buildkit-registries` | Registry host(s) BuildKit must trust the CA for: newline- or comma-separated `host[:port]` values. One `[registry."<host>"]` table is generated per host. See [With BuildKit](#with-buildkit-dockersetup-buildx-action) | No | - |
 | `buildkit-runtime` | Container runtime for BuildKit (e.g., 'io.containerd.runc.v2'). Leave empty to omit runtime configuration | No | - |
 | `skip-certificate-check` | Skip TLS certificate verification when downloading certificates from URLs | No | `false` |
 
@@ -83,7 +104,7 @@ The action **auto-detects** the certificate source type (file path, URL, or inli
 |--------|-------------|
 | `certificate-path` | Path where certificate was installed |
 | `certificate-name` | Name of the installed certificate file |
-| `buildkit-path` | Path to the generated buildkit.toml file (only set if generate-buildkit is true) |
+| `buildkit-path` | Path to the generated buildkit.toml file (only set if generate-buildkit is true). Pass it to `docker/setup-buildx-action`'s `buildkitd-config` input |
 
 ## Permissions
 
@@ -95,11 +116,11 @@ No special permissions are required. Typical workflows need `contents: read` for
 2. **Acquires Certificate**: Downloads from URL, reads from file, or uses inline content
 3. **Validates Format**: Ensures certificate is valid PEM format
 4. **System Installation**: Copies to `/usr/local/share/ca-certificates/` and runs `update-ca-certificates`
-5. **BuildKit Configuration** (optional): Generates `buildkit.toml` file with CA certificate settings
+5. **BuildKit Configuration** (optional): Generates a `buildkit.toml` with a `[registry."<host>"]` CA entry for each host in `buildkit-registries`
 6. **Reports Success**: Outputs installation path, certificate name, and buildkit.toml path
 
 Once installed, the certificate is trusted by:
-- ✅ Docker (push/pull from registries with custom certs)
+- ✅ Docker (push/pull from registries with custom certs). BuildKit builders are the exception: they need the generated config, see [With BuildKit](#with-buildkit-dockersetup-buildx-action)
 - ✅ curl, wget, and other HTTP clients
 - ✅ pip, npm, apt, and other package managers
 - ✅ Git operations over HTTPS
