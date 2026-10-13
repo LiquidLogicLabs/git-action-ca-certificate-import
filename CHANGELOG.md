@@ -1,3 +1,12 @@
+## [3.1.1](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/compare/v3.1.0...v3.1.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **buildkit:** write buildkit-runtime in BuildKit's schema ([4933867](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/commit/4933867e796bb23836d5259beacb38b6289665ca))
+
+
+
 # [3.1.0](https://github.com/LiquidLogicLabs/git-action-ca-certificate-import/compare/v3.0.7...v3.1.0) (2026-10-13)
 
 
