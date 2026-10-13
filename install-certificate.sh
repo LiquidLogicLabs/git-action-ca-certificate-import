@@ -395,15 +395,14 @@ EOF
                 exit 1
                 ;;
         esac
+        # runtime is a table in buildkitd.toml. The former `[worker.containerd] runtime = "..."`
+        # string made buildx create --config fail: "cannot decode TOML string into struct
+        # field config.ContainerdConfig.Runtime".
         cat >> "$BUILDKIT_PATH" << EOF
 
-# Container runtime configuration
-[worker.containerd]
-  runtime = "$INPUT_BUILDKIT_RUNTIME"
-  
-# Additional buildkit configuration
-[worker.containerd.runtimes.runc]
-  runtime_type = "$INPUT_BUILDKIT_RUNTIME"
+# Container runtime for BuildKit's containerd worker
+[worker.containerd.runtime]
+  name = "$INPUT_BUILDKIT_RUNTIME"
 EOF
     fi
     

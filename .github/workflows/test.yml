@@ -78,6 +78,13 @@ jobs:
           echo "  certificate-path: $CERT_PATH"
           echo "  certificate-name: $CERT_NAME"
       
+      # BuildKit tests read generated files back with tomllib (Python >= 3.11;
+      # ubuntu-22.04 ships 3.10).
+      - name: Set up Python for TOML assertions
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
       # Test 2: BuildKit generation
       - name: Test - BuildKit generation
         id: buildkit-test
@@ -116,7 +123,7 @@ jobs:
           fi
           
           # Verify no runtime configuration (default behavior)
-          if grep -q "\[worker.containerd\]" "$BUILDKIT_PATH"; then
+          if grep -q "worker.containerd" "$BUILDKIT_PATH"; then
             echo "✗ buildkit.toml should not contain runtime configuration by default"
             exit 1
           else
@@ -177,13 +184,15 @@ jobs:
             exit 1
           fi
           
-          # Verify runtime configuration is present
-          if grep -q "\[worker.containerd\]" "$BUILDKIT_PATH" && grep -q "io.containerd.runc.v2" "$BUILDKIT_PATH"; then
-            echo "✓ buildkit.toml correctly includes runtime configuration"
-          else
-            echo "✗ buildkit.toml missing runtime configuration"
-            exit 1
-          fi
+          # Verify runtime configuration is present, in BuildKit's schema: runtime is a
+          # table with a name, not a string (a string makes buildx create --config fail).
+          python3 - "$BUILDKIT_PATH" <<'PY'
+          import sys, tomllib
+          cfg = tomllib.load(open(sys.argv[1], 'rb'))
+          got = cfg.get('worker', {}).get('containerd')
+          assert got == {'runtime': {'name': 'io.containerd.runc.v2'}}, f"worker.containerd: {got!r}"
+          print('✓ buildkit.toml includes [worker.containerd.runtime] name')
+          PY
           
           # Verify certificate outputs
           if [ "$CERT_PATH" != "/usr/local/share/ca-certificates/buildkit-runtime-test.crt" ]; then
@@ -201,15 +210,9 @@ jobs:
           echo "  certificate-name: $CERT_NAME"
           echo "  buildkit-path: $BUILDKIT_PATH"
       
-      # Test 3b: buildkit-registries. The generated file is read back with a real TOML
-      # parser (tomllib, Python >= 3.11; ubuntu-22.04 ships 3.10) rather than grepped, so
-      # the assertion is on the structure BuildKit will decode. The e2e workflow proves
-      # BuildKit actually honours it.
-      - name: Set up Python for TOML assertions
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.13'
-
+      # Test 3b: buildkit-registries. The generated file is read back with tomllib rather
+      # than grepped, so the assertion is on the structure BuildKit will decode. The e2e
+      # workflow proves BuildKit actually honours it.
       - name: Test - BuildKit registries (one host)
         id: buildkit-one-host
         uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
@@ -259,7 +262,7 @@ jobs:
           assert got == {h: {'ca': ca} for h in hosts}, f"registry tables: {got!r}"
           # Order follows the input, and the duplicate is dropped.
           assert list(got) == hosts, f"host order: {list(got)!r}"
-          assert 'containerd' in cfg.get('worker', {}), 'buildkit-runtime section was dropped'
+          assert cfg.get('worker') == {'containerd': {'runtime': {'name': 'io.containerd.runc.v2'}}}, f"worker: {cfg.get('worker')!r}"
           print(f'✓ {len(hosts)} registry tables, one per distinct host, runtime kept')
           PY
 

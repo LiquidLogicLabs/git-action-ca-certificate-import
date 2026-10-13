@@ -160,6 +160,8 @@ jobs:
           certificate-name: 'bk-e2e-ca.crt'
           generate-buildkit: 'true'
           buildkit-registries: ${{ env.Z_REGISTRY }}
+          # Included so buildx create --config also proves the runtime section parses.
+          buildkit-runtime: 'io.containerd.runc.v2'
 
       - name: Push through a builder created with each file
         env:
